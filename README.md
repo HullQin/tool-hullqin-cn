@@ -4,7 +4,8 @@
 
 ## 体验地址
 
-URL解析: https://tool.hullqin.cn/url-parser.html
+- URL解析: https://tool.hullqin.cn/url-parser.html
+- 图片裁剪: https://tool.hullqin.cn/img-editor.html
 
 ## 公众号
 

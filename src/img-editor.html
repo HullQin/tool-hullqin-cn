@@ -1,0 +1,91 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+  <meta charset="utf-8" />
+  <title>IMG编辑</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="编辑图片的工具">
+  <style>
+    body {
+      margin: 0;
+      min-width: 360px;
+      background-color: bisque;
+    }
+    #work {
+      width: 100%;
+      background-color: white;
+      margin-top: 4px;
+    }
+    #root {
+      margin: 8px auto;
+      width: 80%;
+    }
+    .hidden {
+      display: none;
+    }
+  </style>
+</head>
+<body>
+<div id="root">
+  <label for="src">请选择图片: </label><input id="src" type="file" />
+  <div>
+    <button id="slice-article">切割为掘金文章封面</button>
+    <button id="slice-column">切割为掘金专栏封面</button>
+  </div>
+  <canvas id="work"></canvas>
+  <img id="background" class="hidden" alt="" src="data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7" />
+  <script>
+    const inputEle = document.getElementById('src');
+    const canvasEle = document.getElementById('work');
+    const imgEle = document.getElementById('background');
+    const sliceArticleEle = document.getElementById('slice-article');
+    const sliceColumnEle = document.getElementById('slice-column');
+    const ctx = canvasEle.getContext('2d');
+    const resetCanvas = () => {
+      canvasEle.setAttribute('width', imgEle.width.toString());
+      canvasEle.setAttribute('height', imgEle.height.toString());
+      ctx.drawImage(imgEle, 0, 0);
+    };
+    const setCanvasSize = (width, height) => {
+      const currentWidth = imgEle.width;
+      const currentHeight = imgEle.height;
+      const a = currentWidth * height;
+      const b = currentHeight * width;
+      if (a === b) return;
+      if (a > b) {
+        const newWidth = b / height;
+        canvasEle.setAttribute('width', newWidth.toString());
+        canvasEle.setAttribute('height', imgEle.height.toString());
+        ctx.drawImage(imgEle, (currentWidth - newWidth) / 2, 0, newWidth, currentHeight, 0, 0, newWidth, currentHeight);
+        return;
+      }
+      const newHeight = a / width;
+      canvasEle.setAttribute('width', imgEle.width.toString());
+      canvasEle.setAttribute('height', newHeight.toString());
+      ctx.drawImage(imgEle, 0, (currentHeight - newHeight) / 2, currentWidth, newHeight, 0, 0, currentWidth, newHeight);
+    };
+    const onFileChange = (event) => {
+      const file = event.target.files[0];
+      if (!file) return;
+      const reader = new FileReader();
+      reader.onload = function () {
+        imgEle.onload = () => {
+          resetCanvas();
+        };
+        imgEle.src = this.result;
+      };
+      reader.readAsDataURL(file);
+    }
+    const onClickSliceArticle = () => {
+      setCanvasSize(1303, 734);
+    };
+    const onClickSliceColumn = () => {
+      setCanvasSize(480, 270);
+    };
+    inputEle.addEventListener('change', onFileChange);
+    sliceArticleEle.addEventListener('click', onClickSliceArticle);
+    sliceColumnEle.addEventListener('click', onClickSliceColumn);
+  </script>
+</div>
+</body>
+</html>
