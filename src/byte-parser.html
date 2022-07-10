@@ -45,9 +45,14 @@
     <textarea id="bytes-16"></textarea>
   </div>
   <div>
-    <label for="value">（整体的值）10进制:</label>
+    <label for="value-int">（整体的值）10进制:</label>
     <br/>
-    <textarea id="value"></textarea>
+    <textarea id="value-int"></textarea>
+  </div>
+  <div>
+    <label for="value-ascii">（整体的值）ASCII:</label>
+    <br/>
+    <textarea id="value-ascii"></textarea>
   </div>
   <div id="message"></div>
   <script>
@@ -57,7 +62,8 @@
       10: document.getElementById('bytes-10'),
       16: document.getElementById('bytes-16'),
     };
-    const valueEle = document.getElementById('value');
+    const valueIntEle = document.getElementById('value-int');
+    const valueAsciiEle = document.getElementById('value-ascii');
     const messageEle = document.getElementById('message');
     const pad = {
       2: 8,
@@ -71,7 +77,16 @@
         const ele = bytesEle[radix];
         ele.value = bytes.map(i => i.toString(radix).padStart(pad[radix], '0').padStart(8, ' ')).join(' ')
       });
-      valueEle.value = bytes.map((i, index) => i * (256 ** (bytes.length - 1 - index))).reduce((a, b) => a + b).toString();
+      if (bytes.length > 6) {
+        valueIntEle.value = '';
+      } else {
+        valueIntEle.value = bytes.map((i, index) => i * (256 ** (bytes.length - 1 - index))).reduce((a, b) => a + b).toString();
+      }
+      if (bytes.every(i => i > 31 && i < 127)) {
+        valueAsciiEle.value = String.fromCharCode(...bytes);
+      } else {
+        valueAsciiEle.value = '';
+      }
     };
     const changeBytesByInt = (value) => {
       let num = Number(value.trim());
@@ -85,8 +100,15 @@
       }
       setBytes(result);
     };
+    const changeBytesByAscii = (value) => {
+      const result = Array.from(value).map(i => i.charCodeAt(0));
+      if (result.findIndex(i => i > 256) >= 0) {
+        throw new Error('解析失败');
+      }
+      setBytes(result);
+    };
     const changeBytesByUin8 = (value, radix) => {
-      const newBytes = value.split(/[^\d]+/).filter(i => i !== '').map(i => parseInt(i.trim(), radix));
+      const newBytes = value.split(/[^\da-fA-F]+/).filter(i => i !== '').map(i => parseInt(i.trim(), radix));
       if (newBytes.findIndex(i => Number.isNaN(i) || i >= 256) >= 0) {
         throw new Error('解析失败');
       }
@@ -103,7 +125,7 @@
     Object.keys(bytesEle).forEach(radix => {
       bytesEle[radix].addEventListener('change', onUint8ValueChange(radix));
     });
-    const onValueChange = (event) => {
+    const onIntValueChange = (event) => {
       try {
         messageEle.innerText = '';
         changeBytesByInt(event.target.value.trim());
@@ -111,7 +133,16 @@
         messageEle.innerText = e.message;
       }
     };
-    valueEle.addEventListener('change', onValueChange);
+    valueIntEle.addEventListener('change', onIntValueChange);
+    const onAsciiValueChange = (event) => {
+      try {
+        messageEle.innerText = '';
+        changeBytesByAscii(event.target.value);
+      } catch (e) {
+        messageEle.innerText = e.message;
+      }
+    };
+    valueAsciiEle.addEventListener('change', onAsciiValueChange);
   </script>
 </div>
 </body>
