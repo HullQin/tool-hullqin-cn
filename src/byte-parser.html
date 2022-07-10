@@ -1,0 +1,118 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+  <meta charset="utf-8" />
+  <title>字节解析</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="解析uint8数组的工具">
+  <style>
+    body {
+      margin: 16px;
+    }
+    textarea {
+      width: 100%;
+      max-width: 100%;
+      min-width: 100%;
+      box-sizing: border-box;
+      height: 3em;
+      font-family: monospace;
+    }
+    #root {
+      margin: 0 auto;
+      width: 90%;
+    }
+    #message {
+      background-color: black;
+      color: white;
+    }
+  </style>
+</head>
+<body>
+<div id="root">
+  <div>
+    <label for="bytes-10">（uin8数组）10进制:</label>
+    <br/>
+    <textarea id="bytes-10"></textarea>
+  </div>
+  <div>
+    <label for="bytes-2">（uin8数组）2进制:</label>
+    <br/>
+    <textarea id="bytes-2"></textarea>
+  </div>
+  <div>
+    <label for="bytes-16">（uin8数组）16进制:</label>
+    <br/>
+    <textarea id="bytes-16"></textarea>
+  </div>
+  <div>
+    <label for="value">（整体的值）10进制:</label>
+    <br/>
+    <textarea id="value"></textarea>
+  </div>
+  <div id="message"></div>
+  <script>
+    let bytes = [];
+    const bytesEle = {
+      2: document.getElementById('bytes-2'),
+      10: document.getElementById('bytes-10'),
+      16: document.getElementById('bytes-16'),
+    };
+    const valueEle = document.getElementById('value');
+    const messageEle = document.getElementById('message');
+    const pad = {
+      2: 8,
+      16: 2,
+      10: 0,
+    };
+    const setBytes = (value) => {
+      bytes = value;
+      console.log(bytes);
+      Object.keys(bytesEle).forEach(radix => {
+        const ele = bytesEle[radix];
+        ele.value = bytes.map(i => i.toString(radix).padStart(pad[radix], '0').padStart(8, ' ')).join(' ')
+      });
+      valueEle.value = bytes.map((i, index) => i * (256 ** (bytes.length - 1 - index))).reduce((a, b) => a + b).toString();
+    };
+    const changeBytesByInt = (value) => {
+      let num = Number(value.trim());
+      if (Number.isNaN(num)) {
+        throw new Error('解析失败');
+      }
+      const result = [];
+      while (num > 0) {
+        result.splice(0, 0, num % 256);
+        num = Math.floor(num / 256);
+      }
+      setBytes(result);
+    };
+    const changeBytesByUin8 = (value, radix) => {
+      const newBytes = value.split(/[^\d]+/).filter(i => i !== '').map(i => parseInt(i.trim(), radix));
+      if (newBytes.findIndex(i => Number.isNaN(i) || i >= 256) >= 0) {
+        throw new Error('解析失败');
+      }
+      setBytes(newBytes);
+    };
+    const onUint8ValueChange = (radix) => (event) => {
+      try {
+        messageEle.innerText = '';
+        changeBytesByUin8(event.target.value.trim(), radix);
+      } catch (e) {
+        messageEle.innerText = e.message;
+      }
+    }
+    Object.keys(bytesEle).forEach(radix => {
+      bytesEle[radix].addEventListener('change', onUint8ValueChange(radix));
+    });
+    const onValueChange = (event) => {
+      try {
+        messageEle.innerText = '';
+        changeBytesByInt(event.target.value.trim());
+      } catch (e) {
+        messageEle.innerText = e.message;
+      }
+    };
+    valueEle.addEventListener('change', onValueChange);
+  </script>
+</div>
+</body>
+</html>
