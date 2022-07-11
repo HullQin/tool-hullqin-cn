@@ -82,7 +82,7 @@
       } else {
         valueIntEle.value = bytes.map((i, index) => i * (256 ** (bytes.length - 1 - index))).reduce((a, b) => a + b).toString();
       }
-      if (bytes.every(i => i > 31 && i < 127)) {
+      if (bytes.every(i => (i === 10 || i > 31) && i < 127)) {
         valueAsciiEle.value = String.fromCharCode(...bytes);
       } else {
         valueAsciiEle.value = '';
