@@ -54,6 +54,11 @@
     <br/>
     <textarea id="value-ascii"></textarea>
   </div>
+  <div>
+    <label for="value-base64">（整体的值）Base64:</label>
+    <br/>
+    <textarea id="value-base64"></textarea>
+  </div>
   <div id="message"></div>
   <script>
     let bytes = [];
@@ -64,6 +69,7 @@
     };
     const valueIntEle = document.getElementById('value-int');
     const valueAsciiEle = document.getElementById('value-ascii');
+    const valueBase64Ele = document.getElementById('value-base64');
     const messageEle = document.getElementById('message');
     const pad = {
       2: 8,
@@ -87,6 +93,7 @@
       } else {
         valueAsciiEle.value = '';
       }
+      valueBase64Ele.value = btoa(String.fromCharCode(...bytes));
     };
     const changeBytesByInt = (value) => {
       let num = Number(value.trim());
@@ -107,7 +114,10 @@
       }
       setBytes(result);
     };
-    const changeBytesByUin8 = (value, radix) => {
+    const changeBytesByBase64 = (value) => {
+      setBytes(Array.from(atob(value)).map(i => i.charCodeAt(0)));
+    };
+    const changeBytesByUint8 = (value, radix) => {
       const newBytes = value.split(/[^\da-fA-F]+/).filter(i => i !== '').map(i => parseInt(i.trim(), radix));
       if (newBytes.findIndex(i => Number.isNaN(i) || i >= 256) >= 0) {
         throw new Error('解析失败');
@@ -117,7 +127,7 @@
     const onUint8ValueChange = (radix) => (event) => {
       try {
         messageEle.innerText = '';
-        changeBytesByUin8(event.target.value.trim(), radix);
+        changeBytesByUint8(event.target.value.trim(), radix);
       } catch (e) {
         messageEle.innerText = e.message;
       }
@@ -143,6 +153,15 @@
       }
     };
     valueAsciiEle.addEventListener('change', onAsciiValueChange);
+    const onBase64ValueChange = (event) => {
+      try {
+        messageEle.innerText = '';
+        changeBytesByBase64(event.target.value);
+      } catch (e) {
+        messageEle.innerText = e.message;
+      }
+    };
+    valueBase64Ele.addEventListener('change', onBase64ValueChange);
   </script>
 </div>
 </body>
