@@ -156,7 +156,7 @@
     const onBase64ValueChange = (event) => {
       try {
         messageEle.innerText = '';
-        changeBytesByBase64(event.target.value);
+        changeBytesByBase64(event.target.value.trim().replace(/_/g, '/').replace(/-/g, '+'));
       } catch (e) {
         messageEle.innerText = e.message;
       }
