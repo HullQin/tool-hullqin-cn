@@ -1,0 +1,142 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+  <meta charset="utf-8">
+  <title>表格转换</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="转换表格的工具">
+  <style>
+    body {
+      margin: 16px;
+    }
+    textarea {
+      display: block;
+      width: 100%;
+      min-width: 100%;
+      max-width: 100%;
+      height: 50vh;
+    }
+    table {
+      margin-top: 8px;
+      border-collapse:collapse;
+    }
+    table,th, td {
+      border: 1px solid black;
+    }
+  </style>
+</head>
+<body>
+<div id="root">
+  <div>
+    <label for="input">把table或markdown粘贴到下方</label>
+    <textarea id="input"></textarea>
+  </div>
+  <div>
+    <table id="table"></table>
+  </div>
+  <script>
+    const isMarkdown = (lines) => {
+      let verticalBarLineCount = 0;
+      let blankLineCount = 0;
+      let tabLineCount = 0;
+      for (const line of lines) {
+        const trimLine = line.trim();
+        if (trimLine.length === 0) {
+          blankLineCount += 1;
+          continue;
+        }
+        if (trimLine.length > 3 && trimLine[0] === '|' && trimLine.substr(1).includes('|')) {
+          verticalBarLineCount += 1;
+        }
+        if (trimLine.length > 3 && trimLine.includes('\t')) {
+          tabLineCount += 1;
+        }
+      }
+      const nonBlankLineCount = lines.length - blankLineCount;
+      if (verticalBarLineCount === 0) return false;
+      if (verticalBarLineCount >= nonBlankLineCount * 0.8) return true;
+      return tabLineCount < verticalBarLineCount;
+    };
+    const judgeGap = (line) => {
+      const chars = new Set();
+      const lineWithoutBlank = line.replace(/\s/g, '');
+      for (const char of lineWithoutBlank) {
+        chars.add(char);
+      }
+      return chars.size === 2 && chars.has('-') && chars.has('|');
+    };
+    const parseContent = (lines) => {
+      const content = [];
+      if (isMarkdown(lines)) {
+        let gapFlag = false;
+        for (const line of lines) {
+          let text = line.trim();
+          if (text[0] === '|') text = text.substr(1);
+          if (text[text.length - 1] === '|') text = text.substr(0, text.length - 2);
+          if (!gapFlag && judgeGap(line)) {
+            gapFlag = true;
+            continue;
+          }
+          const chars = new Set(line);
+          if (chars.size === 0) continue;
+          if (chars.size === 1 && chars.has(' ')) continue;
+          content.push(text.split('|').map(t => t.trim()));
+        }
+      } else {
+        for (const line of lines) {
+          content.push(line.split('\t').map(t => t.trim()));
+        }
+      }
+      return content;
+    };
+    const getMarkdown = (content) => {
+      let markdown = '';
+      let gapFlag = false;
+      for (const line of content) {
+        markdown += '| ';
+        for (const cell of line) {
+          markdown += cell + ' | ';
+        }
+        markdown = markdown.substr(0, markdown.length - 1);
+        markdown += '\n';
+        if (!gapFlag) {
+          gapFlag = true;
+          markdown += '| ';
+          for (const cell of line) {
+            markdown += '--- | ';
+          }
+          markdown = markdown.substr(0, markdown.length - 1);
+          markdown += '\n';
+        }
+      }
+      return markdown;
+    };
+    const getTable = (content) => {
+      let table = '<tbody>';
+      let gapFlag = false;
+      for (const line of content) {
+        table += '<tr>';
+        for (const cell of line) {
+          table += gapFlag ? '<td>' : '<th>';
+          table += cell;
+          table += gapFlag ? '</td>' : '</th>';
+        }
+        table += '</tr>\n';
+        gapFlag = true;
+      }
+      table += '</tbody>';
+      return table;
+    };
+    document.getElementById('input').addEventListener('change', (event) => {
+      const text = event.target.value;
+      const lines = text.split('\n');
+      const content = parseContent(lines);
+      const markdown = getMarkdown(content);
+      const table = getTable(content);
+      document.getElementById('input').value = markdown;
+      document.getElementById('table').innerHTML = table;
+    });
+  </script>
+</div>
+</body>
+</html>

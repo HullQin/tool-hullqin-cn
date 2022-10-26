@@ -8,6 +8,7 @@
 - 图片裁剪: https://tool.hullqin.cn/img-editor.html
 - 字节解析: https://tool.hullqin.cn/byte-parser.html
 - 颜色混合: https://tool.hullqin.cn/color-mixer.html
+- 表格转换: https://tool.hullqin.cn/table-converter.html
 
 ## 公众号
 
