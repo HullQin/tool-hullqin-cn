@@ -1,0 +1,98 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+  <meta charset="utf-8">
+  <title>JSON格式化</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="格式化JSON的工具">
+  <style>
+    body {
+      margin: 16px;
+    }
+
+    #json {
+      width: 100%;
+      box-sizing: border-box;
+      height: 50vh;
+    }
+
+    #root {
+      margin: 0 auto;
+      width: 90%;
+    }
+
+    #message {
+      background-color: black;
+      color: white;
+    }
+  </style>
+</head>
+<body>
+<div id="root">
+  <div>
+    <label>
+      <input type="radio" name="mode" id="radio-1" checked>
+      2空格，基本类型的数组不换行
+    </label>
+    <br/>
+    <label>
+      <input type="radio" name="mode" id="radio-2">
+      2空格
+    </label>
+    <br/>
+    <label>
+      <input type="radio" name="mode" id="radio-3">
+      不换行，不空格
+    </label>
+  </div>
+  <div>
+    <label for="json">请输入待格式化的 JSON 或 JS 对象:</label>
+    <br/>
+    <textarea id="json"></textarea>
+  </div>
+  <div id="message"></div>
+  <script>
+    let data;
+    const textareaEle = document.getElementById('json');
+    const messageEle = document.getElementById('message');
+    const radios = [document.getElementById('radio-1'), document.getElementById('radio-2'), document.getElementById('radio-3')];
+    const getLevelSpaces = (level) => Array(level * 2).fill(' ').join('');
+    const isBasicType = (item) => item === null || typeof item !== 'object';
+    const stringify = (obj, level = 0) => {
+      if (obj === null || obj === undefined) return 'null';
+      if (typeof obj !== 'object') return obj.toString();
+      if (Array.isArray(obj)) {
+        if (obj.every(item => isBasicType(item))) return '[' + obj.join(', ') + ']';
+        return '[\n' + getLevelSpaces(level + 1) + obj.map(item => stringify(item, level + 1)).join(',\n' + getLevelSpaces(level + 1)) + '\n' + getLevelSpaces(level) + ']';
+      }
+      const entries = Object.entries(obj).filter(value => value[1] !== undefined);
+      if (entries.length === 0) return '{}';
+      return '{\n' + getLevelSpaces(level + 1) + entries.map(value => '"' + value[0] + '": ' + stringify(value[1], level + 1)).join(',\n' + getLevelSpaces(level + 1))  + '\n' + getLevelSpaces(level) + '}';
+    };
+    const setJson = () => {
+      if (radios[0].checked) {
+        textareaEle.value = stringify(data);
+        return;
+      }
+      if (radios[1].checked) {
+        textareaEle.value = JSON.stringify(data, null, 2);
+        return;
+      }
+      textareaEle.value = JSON.stringify(data, null, 0);
+    };
+    const jsonOnchange = (event) => {
+      try {
+        messageEle.innerText = '';
+        eval('data = ' + event.target.value.trim());
+        console.log(data);
+        setJson();
+      } catch (e) {
+        messageEle.innerText = e.message;
+      }
+    };
+    textareaEle.addEventListener('change', jsonOnchange);
+    radios.forEach(radio => radio.addEventListener('click', setJson));
+  </script>
+</div>
+</body>
+</html>
