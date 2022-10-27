@@ -9,6 +9,7 @@
 - 字节解析: https://tool.hullqin.cn/byte-parser.html
 - 颜色混合: https://tool.hullqin.cn/color-mixer.html
 - 表格转换: https://tool.hullqin.cn/table-converter.html
+- JSON格式化: https://tool.hullqin.cn/json-formatter.html
 
 ## 公众号
 
