@@ -32,12 +32,12 @@
   <div>
     <label>
       <input type="radio" name="mode" id="radio-1" checked>
-      2空格，基本类型的数组不换行
+      2空格，基本类型数组不换行
     </label>
     <br/>
     <label>
       <input type="radio" name="mode" id="radio-2">
-      2空格
+      2空格，基本类型数组和基本类型对象不换行
     </label>
     <br/>
     <label>
@@ -52,38 +52,47 @@
   </div>
   <div id="message"></div>
   <script>
-    let data;
+    let data = null;
     const textareaEle = document.getElementById('json');
     const messageEle = document.getElementById('message');
     const radios = [document.getElementById('radio-1'), document.getElementById('radio-2'), document.getElementById('radio-3')];
     const getLevelSpaces = (level) => Array(level * 2).fill(' ').join('');
     const isBasicType = (item) => item === null || typeof item !== 'object';
-    const stringify = (obj, level = 0) => {
+    const stringify = (obj, skipBasicObj, level = 0) => {
       if (obj === null || obj === undefined) return 'null';
       if (typeof obj !== 'object') return obj.toString();
       if (Array.isArray(obj)) {
         if (obj.every(item => isBasicType(item))) return '[' + obj.join(', ') + ']';
-        return '[\n' + getLevelSpaces(level + 1) + obj.map(item => stringify(item, level + 1)).join(',\n' + getLevelSpaces(level + 1)) + '\n' + getLevelSpaces(level) + ']';
+        return '[\n' + getLevelSpaces(level + 1) + obj.map(item => stringify(item, skipBasicObj, level + 1)).join(',\n' + getLevelSpaces(level + 1)) + '\n' + getLevelSpaces(level) + ']';
       }
       const entries = Object.entries(obj).filter(value => value[1] !== undefined);
       if (entries.length === 0) return '{}';
-      return '{\n' + getLevelSpaces(level + 1) + entries.map(value => '"' + value[0] + '": ' + stringify(value[1], level + 1)).join(',\n' + getLevelSpaces(level + 1))  + '\n' + getLevelSpaces(level) + '}';
+      if (skipBasicObj && entries.every(value => isBasicType(value[1]))) {
+        return '{' + entries.map(value => '"' + value[0] + '": ' + stringify(value[1], skipBasicObj)).join(', ') + '}';
+      }
+      return '{\n' + getLevelSpaces(level + 1) + entries.map(value => '"' + value[0] + '": ' + stringify(value[1], skipBasicObj, level + 1)).join(',\n' + getLevelSpaces(level + 1)) + '\n' + getLevelSpaces(level) + '}';
     };
     const setJson = () => {
+      if (!data) return;
       if (radios[0].checked) {
-        textareaEle.value = stringify(data);
+        textareaEle.value = stringify(data, false);
         return;
       }
       if (radios[1].checked) {
-        textareaEle.value = JSON.stringify(data, null, 2);
+        textareaEle.value = stringify(data, true);
         return;
       }
       textareaEle.value = JSON.stringify(data, null, 0);
     };
     const jsonOnchange = (event) => {
       try {
+        const text = event.target.value.trim();
         messageEle.innerText = '';
-        eval('data = ' + event.target.value.trim());
+        if (!text) {
+          data = null;
+          return;
+        }
+        eval('data = ' + text);
         console.log(data);
         setJson();
       } catch (e) {
