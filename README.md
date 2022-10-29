@@ -10,6 +10,7 @@
 - 颜色混合: https://tool.hullqin.cn/color-mixer.html
 - 表格转换: https://tool.hullqin.cn/table-converter.html
 - JSON格式化: https://tool.hullqin.cn/json-formatter.html
+- 备忘录: https://tool.hullqin.cn/memo.html
 
 ## 公众号
 
