@@ -60,9 +60,10 @@
     const isBasicType = (item) => item === null || typeof item !== 'object';
     const stringify = (obj, skipBasicObj, level = 0) => {
       if (obj === null || obj === undefined) return 'null';
+      if (typeof obj === 'string') return '"' + obj + '"';
       if (typeof obj !== 'object') return obj.toString();
       if (Array.isArray(obj)) {
-        if (obj.every(item => isBasicType(item))) return '[' + obj.join(', ') + ']';
+        if (obj.every(item => isBasicType(item))) return '[' + obj.map(i => stringify(i)).join(', ') + ']';
         return '[\n' + getLevelSpaces(level + 1) + obj.map(item => stringify(item, skipBasicObj, level + 1)).join(',\n' + getLevelSpaces(level + 1)) + '\n' + getLevelSpaces(level) + ']';
       }
       const entries = Object.entries(obj).filter(value => value[1] !== undefined);
