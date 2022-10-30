@@ -4,7 +4,7 @@
   <meta charset="utf-8">
   <title>备忘录</title>
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <meta name="description" content="信息只保存在本地的备忘录工具">
+  <meta name="description" content="数据只保存在本地的备忘录工具">
   <style>
     body {
       margin: 0;
@@ -64,8 +64,12 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/ace/1.12.3/ext-searchbox.min.js" integrity="sha512-RjWHxvDlXm3I4xLhSj4MeIwRmHDaZr2p6rXhxTgaPEeoUmTtWmgL1c3pIp1iceLnsk95xF5DJw9LvFmwNY2i/Q==" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
 <script>
   let current;
+  let currentMode = 'plain_text';
   let changing = false;
+  const MODES = {py: 'python', go: 'golang', js: 'javascript', ts: 'typescript', c: 'c_cpp', cpp: 'c_cpp', erl: 'erlang', hrl: 'erlang', kt: 'kotlin', md: 'markdown', proto: 'protobuf', conf: 'nginx', txt: 'plain_text', rs: 'rust', rb: 'ruby', v: 'verilog', vhd: 'vhdl', vhdl: 'vhdl'};
+  ['jsx', 'tsx', 'css', 'scss', 'less', 'sql', 'java', 'ejs', 'sh', 'lua', 'svg', 'xml', 'json', 'yaml', 'html', 'ini', 'php', 'r', 'scala'].forEach(i => MODES[i] = i);
   const defaultCursor = {row: 0, column: 0};
+  ace.config.set('basePath', 'https://cdnjs.cloudflare.com/ajax/libs/ace/1.12.3/');
   const editor = ace.edit("editor");
   const setMeta = (meta) => {
     window.localStorage.setItem('meta', JSON.stringify(meta));
@@ -127,7 +131,10 @@
     window.localStorage.removeItem(id.toString() + '-c');
     if (meta.list.length === 0) addMemo();
     meta = getMeta();
-    if (meta.current === id) meta.current = meta.list[0].id;
+    if (meta.current === id) {
+      meta.current = meta.list[0].id;
+      updateMode(meta.list[0].title);
+    }
     setMeta(meta);
     if (current === id) {
       changing = false;
@@ -168,6 +175,7 @@
     changing = true;
     current = id;
     const meta = getMeta();
+    updateMode(meta.list.find(item => item.id === current).title);
     meta.current = id;
     setMeta(meta);
     const [content, cursor] = getMemo(id);
@@ -179,12 +187,25 @@
       changing = false;
     }, 100);
   };
+  const getMode = (name) => {
+    if (!name) return 'plain_text';
+    const t = name.split('.');
+    if (t.length <= 1) return 'plain_text';
+    const type = t[t.length - 1].toLowerCase();
+    return MODES[type] || 'plain_text';
+  };
+  const updateMode = (title) => {
+    const mode = getMode(title);
+    currentMode = mode;
+    editor.session.setMode("ace/mode/" + mode);
+  };
   const changeMemoTitle = (id, title) => {
     const meta = getMeta();
     const index = meta.list.findIndex(item => item.id === id);
     if (index === -1) return;
     meta.list[index].title = title;
     setMeta(meta);
+    updateMode(title);
   };
 
   const renderLists = (() => {
@@ -210,7 +231,9 @@
     window.localStorage.removeItem = function (key) {
       return _removeItem.call(window.localStorage, PREFIX + key);
     }
-    current = getMeta().current;
+    const meta = getMeta();
+    current = meta.current;
+    updateMode(meta.list.find(i => i.id === current).title);
     renderLists();
     changeMemo(current);
     document.getElementById('add').addEventListener('click', () => {
