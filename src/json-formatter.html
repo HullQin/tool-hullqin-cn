@@ -42,6 +42,11 @@
     <br/>
     <label>
       <input type="radio" name="mode" id="radio-3">
+      2空格
+    </label>
+    <br/>
+    <label>
+      <input type="radio" name="mode" id="radio-4">
       不换行，不空格
     </label>
   </div>
@@ -55,7 +60,7 @@
     let data = null;
     const textareaEle = document.getElementById('json');
     const messageEle = document.getElementById('message');
-    const radios = [document.getElementById('radio-1'), document.getElementById('radio-2'), document.getElementById('radio-3')];
+    const radios = [document.getElementById('radio-1'), document.getElementById('radio-2'), document.getElementById('radio-3'), document.getElementById('radio-4')];
     const getLevelSpaces = (level) => Array(level * 2).fill(' ').join('');
     const isBasicType = (item) => item === null || typeof item !== 'object';
     const stringify = (obj, skipBasicObj, level = 0) => {
@@ -81,6 +86,10 @@
       }
       if (radios[1].checked) {
         textareaEle.value = stringify(data, true);
+        return;
+      }
+      if (radios[2].checked) {
+        textareaEle.value = JSON.stringify(data, null, 2);
         return;
       }
       textareaEle.value = JSON.stringify(data, null, 0);
