@@ -10,7 +10,7 @@
       margin: 16px;
     }
     textarea {
-      display: block;
+      box-sizing: border-box;
       width: 100%;
       min-width: 100%;
       max-width: 100%;
@@ -20,8 +20,12 @@
       margin-top: 8px;
       border-collapse:collapse;
     }
-    table,th, td {
+    table, th, td {
       border: 1px solid black;
+    }
+    th, td {
+      min-width: 22px;
+      min-height: 22px;
     }
   </style>
 </head>
@@ -30,6 +34,12 @@
   <div>
     <label for="input">把table或markdown粘贴到下方</label>
     <textarea id="input"></textarea>
+  </div>
+  <div>
+    <label style="display:inline-flex;align-items:center">
+      <input id="table-editable" type="checkbox">
+      <span>表格可编辑</span>
+    </label>
   </div>
   <div>
     <table id="table"></table>
@@ -72,7 +82,7 @@
         for (const line of lines) {
           let text = line.trim();
           if (text[0] === '|') text = text.substr(1);
-          if (text[text.length - 1] === '|') text = text.substr(0, text.length - 2);
+          if (text[text.length - 1] === '|') text = text.substr(0, text.length - 1);
           if (!gapFlag && judgeGap(line)) {
             gapFlag = true;
             continue;
@@ -80,11 +90,17 @@
           const chars = new Set(line);
           if (chars.size === 0) continue;
           if (chars.size === 1 && chars.has(' ')) continue;
-          content.push(text.split('|').map(t => t.trim()));
+          content.push(text.split(/(?<!\\)\|/).map(t => t.trim().replace(/\\\|/g, '|')));
         }
       } else {
         for (const line of lines) {
           content.push(line.split('\t').map(t => t.trim()));
+        }
+      }
+      const maxLength = content.length === 0 ? 0 : Math.max(...content.map(i => i.length));
+      for (const line of content) {
+        if (line.length < maxLength) {
+          line.push(...Array(maxLength - line.length).fill(''));
         }
       }
       return content;
@@ -95,7 +111,7 @@
       for (const line of content) {
         markdown += '| ';
         for (const cell of line) {
-          markdown += cell + ' | ';
+          markdown += cell.replace(/\|/g, '\\|') + ' | ';
         }
         markdown = markdown.substr(0, markdown.length - 1);
         markdown += '\n';
@@ -114,10 +130,11 @@
     const getTable = (content) => {
       let table = '<tbody>';
       let gapFlag = false;
+      const attr = tableEditableEl.checked ? ' contenteditable>' : '>';
       for (const line of content) {
         table += '<tr>';
         for (const cell of line) {
-          table += gapFlag ? '<td>' : '<th>';
+          table += (gapFlag ? '<td' : '<th') + attr;
           table += cell;
           table += gapFlag ? '</td>' : '</th>';
         }
@@ -127,14 +144,27 @@
       table += '</tbody>';
       return table;
     };
+    let content;
     document.getElementById('input').addEventListener('change', (event) => {
       const text = event.target.value;
       const lines = text.split('\n');
-      const content = parseContent(lines);
+      content = parseContent(lines);
+      console.log(content);
       const markdown = getMarkdown(content);
       const table = getTable(content);
       document.getElementById('input').value = markdown;
       document.getElementById('table').innerHTML = table;
+    });
+    const tableEditableEl = document.getElementById('table-editable');
+    tableEditableEl.addEventListener('click', (event) => {
+      const value = event.target.checked;
+      if (value) {
+        Array.from(document.getElementsByTagName('th')).forEach(el => el.setAttribute('contenteditable', ''));
+        Array.from(document.getElementsByTagName('td')).forEach(el => el.setAttribute('contenteditable', ''));
+      } else {
+        Array.from(document.getElementsByTagName('th')).forEach(el => el.removeAttribute('contenteditable'));
+        Array.from(document.getElementsByTagName('td')).forEach(el => el.removeAttribute('contenteditable'));
+      }
     });
   </script>
 </div>
