@@ -28,8 +28,21 @@
       min-height: 22px;
     }
   </style>
+  <style>body{display:flex}#root{flex:1}#navigation>div>a{text-decoration:none;margin:4px 8px}</style>
 </head>
 <body>
+<div id="navigation">
+  <a style="color:black;text-decoration:none" href="/"><h1 style="margin:4px 10px;font-size:20px">tool.hullqin.cn</h1></a>
+  <div style="display:flex;flex-direction:column;text-align:center">
+    <a href="memo.html">备忘录</a>
+    <a href="url-parser.html">URL解析</a>
+    <a href="byte-parser.html">字节解析</a>
+    <a href="json-formatter.html">JSON格式化</a>
+    <a href="table-converter.html" onclick="event.preventDefault()" style="color:black">表格转换</a>
+    <a href="color-mixer.html">颜色混合</a>
+    <a href="img-editor.html">图片裁剪</a>
+  </div>
+</div>
 <div id="root" style="margin:16px">
   <div>
     <label for="input">把table或markdown粘贴到下方</label>
