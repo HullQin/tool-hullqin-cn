@@ -1,0 +1,42 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+  <meta charset="utf-8">
+  <title>清除换行符</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="清除文本换行符的工具">
+  <style>
+    body {
+      margin: 0;
+    }
+    textarea {
+      width: 100%;
+      max-width: 100%;
+      min-width: 100%;
+      box-sizing: border-box;
+      height: 50vh;
+    }
+    #message {
+      background-color: black;
+      color: white;
+    }
+  </style>
+</head>
+<body>
+<div id="root" style="margin:16px">
+  <div>
+    <label for="text">请输入一段文本，将清除换行符:</label>
+    <br/>
+    <textarea id="text"></textarea>
+  </div>
+  <div id="message"></div>
+</div>
+<script>
+  const textElement = document.getElementById('text');
+  textElement.addEventListener('change', (event) => {
+    const value = event.target.value.trim();
+    textElement.value = value.replace(/-\n\s*/g, '-').replace(/\n/g, ' ').replace(/ +/g, ' ');
+  });
+</script>
+</body>
+</html>

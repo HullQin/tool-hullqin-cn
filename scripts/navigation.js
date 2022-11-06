@@ -7,6 +7,7 @@ const config = [
   {name: '字节解析', url: 'byte-parser.html'},
   {name: 'JSON格式化', url: 'json-formatter.html'},
   {name: '表格转换', url: 'table-converter.html'},
+  {name: '换行符清除', url: 'line-break-remover.html'},
   {name: '颜色混合', url: 'color-mixer.html'},
   {name: '图片裁剪', url: 'img-editor.html'},
 ];
@@ -22,7 +23,7 @@ const getNavigationHtml = (filename) => {
   div += '\n  </div>\n</div>';
   return div;
 };
-const navigationStyle = '  <style>body{display:flex}#root{flex:1}#navigation>div>a{text-decoration:none;margin:4px 8px}</style>\n';
+const navigationStyle = '  <style>body{display:flex;align-items:flex-start}#root{flex:1}#navigation>div>a{text-decoration:none;margin:4px 8px}</style>\n';
 
 const addNavigation = (html, filename) => {
   let newHtml = html;
