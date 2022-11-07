@@ -9,6 +9,7 @@
 
 ## 体验地址
 
+- 主页: https://tool.hullqin.cn
 - 备忘录: https://tool.hullqin.cn/memo.html
 - URL解析: https://tool.hullqin.cn/url-parser.html
 - 字节解析: https://tool.hullqin.cn/byte-parser.html
