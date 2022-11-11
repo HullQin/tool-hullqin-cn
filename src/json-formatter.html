@@ -62,7 +62,7 @@
   const isBasicType = (item) => item === null || typeof item !== 'object';
   const stringify = (obj, skipBasicObj, level = 0) => {
     if (obj === null || obj === undefined) return 'null';
-    if (typeof obj === 'string') return '"' + obj + '"';
+    if (typeof obj === 'string') return '"' + obj.replace(/"/g, '\\"') + '"';
     if (typeof obj !== 'object') return obj.toString();
     if (Array.isArray(obj)) {
       if (obj.every(item => isBasicType(item))) return '[' + obj.map(i => stringify(i)).join(', ') + ']';
@@ -99,7 +99,11 @@
         data = null;
         return;
       }
-      eval('data = ' + text);
+      try {
+        data = JSON.parse(text);
+      } catch {
+        eval('data = ' + text);
+      }
       console.log(data);
       setJson();
     } catch (e) {
