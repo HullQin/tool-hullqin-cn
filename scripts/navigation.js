@@ -5,6 +5,7 @@ const config = [
   {name: '备忘录', url: 'memo.html'},
   {name: 'URL解析', url: 'url-parser.html'},
   {name: '字节解析', url: 'byte-parser.html'},
+  {name: 'String解析', url: 'string-parser.html'},
   {name: 'JSON格式化', url: 'json-formatter.html'},
   {name: '表格转换', url: 'table-converter.html'},
   {name: '换行符清除', url: 'line-break-remover.html'},

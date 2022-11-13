@@ -1,0 +1,170 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+  <meta charset="utf-8">
+  <title>String解析</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="解析字符串和转换字符串编码的工具">
+  <style>
+    body {
+      margin: 0;
+    }
+    textarea {
+      width: 100%;
+      max-width: 100%;
+      min-width: 100%;
+      box-sizing: border-box;
+      height: 3em;
+      font-family: monospace;
+    }
+    #root {
+      margin: 16px;
+    }
+    #message {
+      background-color: black;
+      color: white;
+    }
+  </style>
+</head>
+<body>
+<div id="root">
+  <div>
+    <label for="utf8-10">(uint8数组) 10进制 UTF-8:</label>
+    <br/>
+    <textarea id="utf8-10"></textarea>
+  </div>
+  <div>
+    <label for="utf8-2">(uint8数组) 2进制 UTF-8:</label>
+    <br/>
+    <textarea id="utf8-2"></textarea>
+  </div>
+  <div>
+    <label for="utf8-16">(uint8数组) 16进制 UTF-8:</label>
+    <br/>
+    <textarea id="utf8-16"></textarea>
+  </div>
+  <div>
+    <label for="utf16-10">(uint16数组) 10进制 UTF-16:</label>
+    <br/>
+    <textarea id="utf16-10"></textarea>
+  </div>
+  <div>
+    <label for="utf16-be-2">(uint8数组) 2进制 UTF-16-BE:</label>
+    <br/>
+    <textarea id="utf16-be-2"></textarea>
+  </div>
+  <div>
+    <label for="utf16-be-16">(uint8数组) 16进制 UTF-16-BE:</label>
+    <br/>
+    <textarea id="utf16-be-16"></textarea>
+  </div>
+  <div>
+    <label for="unicode-16">(uint数组) 16进制 Unicode:</label>
+    <br/>
+    <textarea id="unicode-16"></textarea>
+  </div>
+  <div>
+    <label for="string">字符串:</label>
+    <br/>
+    <textarea id="string"></textarea>
+  </div>
+  <div id="message"></div>
+</div>
+<script>
+  let string = '';
+  const utf8Ele = {
+    2: document.getElementById('utf8-2'),
+    10: document.getElementById('utf8-10'),
+    16: document.getElementById('utf8-16'),
+  };
+  const utf16BeEle = {
+    2: document.getElementById('utf16-be-2'),
+    16: document.getElementById('utf16-be-16'),
+  };
+  const utf16Ele = document.getElementById('utf16-10');
+  const unicodeEle = document.getElementById('unicode-16');
+  const stringEle = document.getElementById('string');
+  const messageEle = document.getElementById('message');
+  const pad = {
+    2: 8,
+    16: 2,
+    10: 0,
+  };
+  const getUint8ByString = (value) => {
+    return Array.from(new TextEncoder().encode(value));
+  };
+  const getUtf16ByString = (value) => {
+    const result = [];
+    for (let i = 0; i < value.length; i++) {
+      result.push(value.charCodeAt(i));
+    }
+    return result;
+  };
+  const setString = (value) => {
+    string = value;
+    console.log(string);
+    const uint8 = getUint8ByString(value);
+    Object.keys(utf8Ele).forEach(radix => {
+      const ele = utf8Ele[radix];
+      ele.value = uint8.map(i => i.toString(radix).padStart(pad[radix], '0').padStart(8, ' ')).join(' ');
+    });
+    const uint16 = getUtf16ByString(value);
+    utf16Ele.value = uint16.map(i => i.toString().padStart(17, ' ')).join(' ');
+    Object.keys(utf16BeEle).forEach(radix => {
+      const ele = utf16BeEle[radix];
+      ele.value = uint16.map(i => i.toString(radix).padStart(pad[radix] * 2, '0')).map(i => i.substring(0, pad[radix]).padStart(8, ' ') + ' ' + i.substring(pad[radix]).padStart(8, ' ')).join(' ');
+    });
+    unicodeEle.value = Array.from(value).map(i => i.codePointAt(0).toString(16).toUpperCase().padStart(8, ' ')).join(' ');
+    stringEle.value = value;
+  };
+  const onChange = (func) => (event) => {
+    try {
+      messageEle.innerText = '';
+      func(event.target.value.trim());
+    } catch (e) {
+      messageEle.innerText = e.message;
+    }
+  };
+  stringEle.addEventListener('change', onChange(setString));
+  const changeUnicode = (value) => {
+    const unicode = value.split(/[^\da-fA-F]+/).filter(i => i !== '').map(i => parseInt(i.trim(), 16));
+    setString(String.fromCodePoint(...unicode));
+  };
+  unicodeEle.addEventListener('change', onChange(changeUnicode));
+  const changeUtf8 = (radix) => (value) => {
+    const utf8 = value.split(/[^\da-fA-F]+/).filter(i => i !== '').map(i => parseInt(i.trim(), radix));
+    if (utf8.findIndex(i => Number.isNaN(i) || i >= 256) >= 0) {
+      throw new Error('解析失败');
+    }
+    setString(new TextDecoder().decode(Uint8Array.from(utf8)));
+  };
+  Object.keys(utf8Ele).forEach((radix) => {
+    utf8Ele[radix].addEventListener('change', onChange(changeUtf8(Number(radix))));
+  });
+  const isLittleEndian = (() => {
+    const buffer = new ArrayBuffer(2);
+    new DataView(buffer).setInt16(0, 256, true);
+    return new Int16Array(buffer)[0] === 256;
+  })();
+  const changeUtf16 = (value) => {
+    const utf16 = Uint16Array.from(value.split(/[^\d]+/).filter(i => i !== '').map(i => parseInt(i.trim())));
+    setString(new TextDecoder(isLittleEndian ? 'utf-16le' : 'utf-16be').decode(utf16));
+  };
+  utf16Ele.addEventListener('change', onChange(changeUtf16));
+  const changeUtf16Be = (radix) => (value) => {
+    const uint8 = value.split(/[^\da-fA-F]+/).filter(i => i !== '').map(i => parseInt(i.trim(), radix));
+    if (uint8.length % 2 > 0 || uint8.findIndex(i => Number.isNaN(i) || i >= 256) >= 0) {
+      throw new Error('解析失败');
+    }
+    const utf16 = [];
+    for (let i = 0; i < uint8.length; i = i + 2) {
+      utf16.push((uint8[i] << 8) + uint8[i + 1]);
+    }
+    setString(new TextDecoder(isLittleEndian ? 'utf-16le' : 'utf-16be').decode(Uint16Array.from(utf16)));
+  };
+  Object.keys(utf16BeEle).forEach((radix) => {
+    utf16BeEle[radix].addEventListener('change', onChange(changeUtf16Be(Number(radix))));
+  });
+</script>
+</body>
+</html>
