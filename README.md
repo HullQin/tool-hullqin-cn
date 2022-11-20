@@ -13,6 +13,7 @@
 - 备忘录: https://tool.hullqin.cn/memo.html
 - URL解析: https://tool.hullqin.cn/url-parser.html
 - 字节解析: https://tool.hullqin.cn/byte-parser.html
+- ProtoBuf解析: https://tool.hullqin.cn/pb-parser.html
 - JSON格式化: https://tool.hullqin.cn/json-formatter.html
 - 表格转换: https://tool.hullqin.cn/table-converter.html
 - 换行符清除: https://tool.hullqin.cn/line-break-remover.html

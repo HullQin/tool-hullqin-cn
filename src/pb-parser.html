@@ -1,0 +1,172 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+  <meta charset="utf-8">
+  <title>Protocol Buffers解析</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="解析 Protocol Buffers 的工具">
+  <style>
+    body {
+      margin: 0;
+    }
+    textarea {
+      width: 100%;
+      max-width: 100%;
+      min-width: 100%;
+      box-sizing: border-box;
+      height: 3em;
+      font-family: monospace;
+    }
+    #root {
+      margin: 16px;
+    }
+    #message {
+      background-color: black;
+      color: white;
+    }
+  </style>
+</head>
+<body>
+<div id="root">
+  <div>
+    【工具说明】
+  </div>
+  <div>
+    反解 Protocol Buffers，无需提供 proto 定义，只需提供 PB 二进制，工具帮你尝试解析它。只支持 proto3。
+  </div>
+  <div>
+    <label for="bytes-10">(uint8数组) 10进制:</label>
+    <br/>
+    <textarea id="bytes-10"></textarea>
+  </div>
+  <div>
+    <label for="bytes-2">(uint8数组) 2进制:</label>
+    <br/>
+    <textarea id="bytes-2"></textarea>
+  </div>
+  <div>
+    <label for="bytes-16">(uint8数组) 16进制:</label>
+    <br/>
+    <textarea id="bytes-16"></textarea>
+  </div>
+  <div>(JSON) 解析结果:</div>
+  <pre id="json"></pre>
+  <div id="message"></div>
+</div>
+<script>
+  let bytes = [];
+  const bytesEle = {
+    2: document.getElementById('bytes-2'),
+    10: document.getElementById('bytes-10'),
+    16: document.getElementById('bytes-16'),
+  };
+  const jsonEle = document.getElementById('json');
+  const messageEle = document.getElementById('message');
+  const pad = {
+    2: 8,
+    16: 2,
+    10: 0,
+  };
+  const parseBytes = (value) => {
+    let i = 0;
+    const result = {};
+    try {
+      const iPlusPlus = () => {
+        i++;
+        if (i >= value.length) throw new Error('Not Protocol Buffers');
+      };
+      while (i < value.length) {
+        const type = value[i] & 7;
+        const seq = value[i] >> 3;
+        const key = seq.toString() + ':' + {0: 'VARINT', 1: 'I64', 2: 'LEN', 5: 'I32'}[type];
+        if (type === 0) {
+          result[key] = 0;
+          const t = [];
+          while (true) {
+            iPlusPlus();
+            t.push(value[i] & 127);
+            if (t.length > 10) throw new Error('Not Protocol Buffers');
+            if ((value[i] & 128) === 0) break;
+          }
+          for (let j = 0; j < t.length; j++) {
+            result[key] += t[j] << (7 * j);
+          }
+        } else if (type === 5) {
+          result[key] = 0;
+          for (const j of [0, 1, 2, 3]) {
+            iPlusPlus();
+            result[key] += value[i] << (8 * j);
+          }
+        } else if (type === 1) {
+          result[key] = 0;
+          for (const j of [0, 1, 2, 3, 4, 5, 6, 7]) {
+            iPlusPlus();
+            result[key] += value[i] << (8 * j);
+          }
+        } else if (type === 2) {
+          iPlusPlus();
+          const length = value[i];
+          if (i + length >= value.length) throw new Error('Not Protocol Buffers');
+          const temp = result[key];
+          if (temp === undefined) {
+            result[key] = parseBytes(value.slice(i + 1, i + 1 + length));
+          } else if (Array.isArray(temp)) {
+            temp.push(parseBytes(value.slice(i + 1, i + 1 + length)));
+          } else {
+            result[key] = [result[key], parseBytes(value.slice(i + 1, i + 1 + length))];
+          }
+          i += length;
+        } else {
+          throw new Error('Not Protocol Buffers');
+        }
+        i++;
+      }
+      return result;
+    } catch (e) {
+      if (e.message === 'Not Protocol Buffers') {
+        return '[' + value.join(', ') + ']';
+      }
+      throw e;
+    }
+  };
+  const setBytes = (value) => {
+    bytes = value;
+    console.log(bytes);
+    Object.keys(bytesEle).forEach(radix => {
+      const ele = bytesEle[radix];
+      ele.value = bytes.map(i => i.toString(Number(radix)).padStart(pad[radix], '0').padStart(8, ' ')).join(' ')
+    });
+    jsonEle.textContent = JSON.stringify(parseBytes(bytes), null, 2);
+  };
+  const changeBytesByUint8 = (value, radix) => {
+    if (radix === 16) {
+      const newBytes = [];
+      for (const v of value.split(/[^\da-fA-F]+/).filter(i => i !== '')) {
+        const hex = v.length % 2 ? '0' + v : v;
+        for (let i = 0; i < hex.length; i += 2) {
+          newBytes.push(parseInt(hex.substring(i, i + 2), 16));
+        }
+      }
+      setBytes(newBytes);
+    } else {
+      const newBytes = value.split(/[^\d]+/).filter(i => i !== '').map(i => parseInt(i.trim(), radix));
+      if (newBytes.findIndex(i => Number.isNaN(i) || (radix !== 16 && i >= 256)) >= 0) {
+        throw new Error('解析失败');
+      }
+      setBytes(newBytes);
+    }
+  };
+  const onUint8ValueChange = (radix) => (event) => {
+    try {
+      messageEle.innerText = '';
+      changeBytesByUint8(event.target.value.trim(), radix);
+    } catch (e) {
+      messageEle.innerText = e.message;
+    }
+  }
+  Object.keys(bytesEle).forEach(radix => {
+    bytesEle[radix].addEventListener('change', onUint8ValueChange(Number(radix)));
+  });
+</script>
+</body>
+</html>
