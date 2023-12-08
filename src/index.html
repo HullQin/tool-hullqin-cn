@@ -28,6 +28,26 @@
     <br>
     <span>不信？你看源码: <a href="https://github.com/HullQin/tool-hullqin-cn">github.com/HullQin/tool-hullqin-cn</a></span>
   </div>
+  <div style="text-align: center">
+    <button id="btn-ua">查看我的浏览器的 User-Agent</button>
+    <button id="btn-ip" style="margin-left: 16px">查看我的 IP</button>
+  </div>
+  <div id="info-ip" style="margin-top: 16px; text-align: center"></div>
+  <div id="info-ua" style="margin-top: 16px; font-size: 12px"></div>
 </div>
+<script>
+  var uaButton = document.getElementById('btn-ua');
+  var ipButton = document.getElementById('btn-ip');
+  uaButton.addEventListener('click', function() {
+    document.getElementById('info-ua').innerText = window.navigator.userAgent;
+    uaButton.setAttribute('disabled', 'disabled');
+  });
+  ipButton.addEventListener('click', function() {
+    ipButton.setAttribute('disabled', 'disabled');
+    fetch('/ip').then(function(res) {
+      document.getElementById('info-ip').innerText = res.headers.get('x-client-ip');
+    });
+  });
+</script>
 </body>
 </html>
