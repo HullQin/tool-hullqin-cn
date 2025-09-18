@@ -29,6 +29,7 @@
   <label for="url">请输入待解析的URL:</label>
   <br/>
   <textarea id="url"></textarea>
+  <button id="btn">跳转到该URL</button>
   <div id="message"></div>
   <pre id="result"></pre>
 </div>
@@ -37,6 +38,7 @@
   const textareaEle = document.getElementById('url');
   const resultEle = document.getElementById('result');
   const messageEle = document.getElementById('message');
+  const buttonEle = document.getElementById('btn');
   const setUrl = (newUrl) => {
     url = newUrl;
     console.log(newUrl);
@@ -61,6 +63,9 @@
     }
   }
   textareaEle.addEventListener('change', urlOnchange);
+  buttonEle.addEventListener('click', () => {
+    window.location.href = url;
+  });
 </script>
 </body>
 </html>
