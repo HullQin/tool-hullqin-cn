@@ -1,0 +1,376 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+  <meta charset="utf-8">
+  <title>SVG预览</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="预览和标记SVG的工具">
+  <style>
+    body {
+      margin: 0;
+    }
+    #root {
+      display: flex;
+    }
+    #root>div{
+      flex: 1;
+    }
+    #svg-container {
+      overflow: auto;
+      display: flex;
+      justify-content: center;
+      padding: 8px;
+    }
+    textarea {
+      width: calc(100% - 8px);
+      margin-right: 8px;
+      height: 400px;
+      resize: none;
+      box-sizing: border-box;
+    }
+    svg {
+      display: block;
+      width: 100px;
+      height: 100px;
+      border: 1px solid black;
+    }
+  </style>
+</head>
+<body>
+<div id="root">
+  <div>
+    <div>
+      <button id="svg-bigger">放大</button>
+      <button id="svg-smaller">缩小</button>
+      <button id="svg-reset">重置</button>
+      <button id="svg-fit">适应</button>
+      <span id="scale-indicator">缩放: 100%</span>
+      <span id="coordinate-display" style="margin-left: 20px; color: #666;">坐标: (0, 0)</span>
+    </div>
+    <div id="svg-container">
+      <svg id="svg" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"></svg>
+    </div>
+  </div>
+  <div>
+    <label for="svg-source">SVG 源码:</label>
+    <br/>
+    <textarea id="svg-source"></textarea>
+    <br/>
+    <label for="coordinate-log">坐标记录:</label>
+    <br/>
+    <textarea id="coordinate-log" style="height: 200px;"></textarea>
+    <br/>
+  </div>
+</div>
+<script>
+  const svgContainerEle = document.getElementById('svg-container');
+  const textareaEle = document.getElementById('svg-source');
+  const buttonSvgBiggerEle = document.getElementById('svg-bigger');
+  const buttonSvgSmallerEle = document.getElementById('svg-smaller');
+  const buttonSvgResetEle = document.getElementById('svg-reset');
+  const buttonSvgFitEle = document.getElementById('svg-fit');
+  const scaleIndicatorEle = document.getElementById('scale-indicator');
+  const coordinateDisplayEle = document.getElementById('coordinate-display');
+  const coordinateLogEle = document.getElementById('coordinate-log');
+  textareaEle.value = '<svg id="svg" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100">\n\n</svg>';
+
+  // SVG容错处理函数
+  function processSvgInput(input) {
+    let processed = input.trim();
+
+    // 1. 属性名转换：React JSX -> SVG标准
+    const attributeMap = {
+      'strokeLinejoin': 'stroke-linejoin',
+      'strokeWidth': 'stroke-width',
+      'gradientUnits': 'gradient-units',
+      'stopColor': 'stop-color',
+      'strokeLinecap': 'stroke-linecap',
+      'strokeDasharray': 'stroke-dasharray',
+      'strokeDashoffset': 'stroke-dashoffset',
+      'strokeOpacity': 'stroke-opacity',
+      'xlinkHref': 'xlink:href',
+      'fontSize': 'font-size',
+      'fontWeight': 'font-weight',
+      'alignmentBaseline': 'alignment-baseline',
+      'dominantBaseline': 'dominant-baseline',
+      'textAnchor': 'text-anchor',
+    };
+
+    for (const [jsxAttr, svgAttr] of Object.entries(attributeMap)) {
+      const regex = new RegExp(`\\b${jsxAttr}\\b`, 'g');
+      processed = processed.replace(regex, svgAttr);
+    }
+
+    processed = processed.replace(/<SVGText/g, '<text alignment-baseline="central" dominant-baseline="central" text-anchor="middle"');
+    processed = processed.replace(/<SVGText\/>/g, '<text/>');
+
+    // 2. 属性值转换：{} -> 空字符串，处理嵌套花括号
+    processed = processed.replace(/\{[^{}]*(?:\{[^{}]*\}[^{}]*)*\}/g, '""');
+
+    // 3. 检查是否被<svg>标签包裹，如果没有则添加
+    if (!processed.match(/^\s*<svg\b/i)) {
+      processed = `<svg id="svg" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100">\n${processed}\n</svg>`;
+    }
+
+    return processed;
+  }
+
+  const sourceOnchange = (event) => {
+    try {
+      const processedSvg = processSvgInput(event.target.value);
+      svgContainerEle.innerHTML = processedSvg;
+      textareaEle.value = processedSvg;
+      // 更新SVG后自动调整尺寸
+      setTimeout(() => {
+        setSvgSize(currentScale);
+      }, 100);
+    } catch (e) {
+      console.error(e);
+    }
+  }
+
+  textareaEle.addEventListener('change', sourceOnchange);
+
+  let currentScale = 1;
+  const scaleStep = 0.2;
+  const minScale = 0.1;
+  const maxScale = 5;
+  let clickPoints = []; // 存储点击的坐标点
+
+  function updateScaleIndicator() {
+    scaleIndicatorEle.textContent = `缩放: ${Math.round(currentScale * 100)}%`;
+  }
+
+  // 将屏幕坐标转换为SVG内部坐标
+  function screenToSvgCoords(screenX, screenY) {
+    const svgElement = document.querySelector('#svg-container svg');
+    if (!svgElement) return { x: 0, y: 0 };
+
+    const rect = svgElement.getBoundingClientRect();
+    const viewBox = svgElement.viewBox.baseVal;
+
+    // 计算相对位置（0-1之间）
+    const relativeX = (screenX - rect.left) / rect.width;
+    const relativeY = (screenY - rect.top) / rect.height;
+
+    // 计算SVG内部坐标，考虑viewBox的起始坐标
+    const x = viewBox.x + relativeX * viewBox.width;
+    const y = viewBox.y + relativeY * viewBox.height;
+
+    return { x: x, y: y };
+  }
+
+  // 更新坐标显示
+  function updateCoordinateDisplay(x, y) {
+    coordinateDisplayEle.textContent = `坐标: (${x.toFixed(2)}, ${y.toFixed(2)})`;
+  }
+
+  // 添加点击坐标到记录
+  function addClickPoint(x, y) {
+    clickPoints.push({ x: x, y: y });
+
+    // 更新坐标记录textarea
+    const logText = clickPoints.map(point =>
+      `${point.x.toFixed(2)},${point.y.toFixed(2)}`
+    ).join('\n');
+    coordinateLogEle.value = logText;
+
+    // 在SVG中添加红色圆点
+    addPointToSvg(x, y);
+  }
+
+  // 计算圆点的半径和边框宽度
+  function calculatePointSize() {
+    const svgElement = document.querySelector('#svg-container svg');
+    if (!svgElement) return { r: 2, strokeWidth: 1 };
+
+    const viewBox = svgElement.viewBox.baseVal;
+    const rect = svgElement.getBoundingClientRect();
+
+    // 计算SVG的缩放比例
+    const scaleX = rect.width / viewBox.width;
+    const scaleY = rect.height / viewBox.height;
+    const scale = Math.min(scaleX, scaleY); // 使用较小的缩放比例确保圆点不会过大
+
+    // 计算在SVG坐标系中应该设置的半径和边框宽度
+    // 目标：实际显示时半径2px，边框宽度1px
+    const targetRadius = 2; // 目标半径2px
+    const targetStrokeWidth = 1; // 目标边框宽度1px
+
+    const r = targetRadius / scale;
+    const strokeWidth = targetStrokeWidth / scale;
+
+    return { r: r, strokeWidth: strokeWidth };
+  }
+
+  // 在SVG中添加红色圆点
+  function addPointToSvg(x, y) {
+    const svgElement = document.querySelector('#svg-container svg');
+    if (!svgElement) return;
+
+    const sizes = calculatePointSize();
+
+    const circle = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
+    circle.setAttribute('cx', x);
+    circle.setAttribute('cy', y);
+    circle.setAttribute('r', sizes.r);
+    circle.setAttribute('fill', 'red');
+    circle.setAttribute('stroke', 'black');
+    circle.setAttribute('stroke-width', sizes.strokeWidth);
+    circle.setAttribute('data-mark-point', 'true');
+
+    svgElement.appendChild(circle);
+  }
+
+  // 从textarea更新点击点
+  function updateClickPointsFromTextarea() {
+    const text = coordinateLogEle.value.trim();
+    if (!text) {
+      clearClickPoints();
+      return;
+    }
+
+    const lines = text.split('\n');
+    const newPoints = [];
+
+    lines.forEach(line => {
+      const trimmedLine = line.trim();
+      if (trimmedLine) {
+        const parts = trimmedLine.split(',');
+        if (parts.length === 2) {
+          const x = parseFloat(parts[0]);
+          const y = parseFloat(parts[1]);
+          if (!isNaN(x) && !isNaN(y)) {
+            newPoints.push({ x: x, y: y });
+          }
+        }
+      }
+    });
+
+    clickPoints = newPoints;
+    updateSvgPoints();
+  }
+
+  // 更新SVG中的圆点
+  function updateSvgPoints() {
+    const svgElement = document.querySelector('#svg-container svg');
+    if (!svgElement) return;
+
+    // 清除现有圆点且属性data-mark-point="true"
+    const circles = svgElement.querySelectorAll('circle[data-mark-point="true"]');
+    circles.forEach(circle => circle.remove());
+
+    // 添加新的圆点
+    clickPoints.forEach(point => {
+      addPointToSvg(point.x, point.y);
+    });
+  }
+
+  // 更新所有标记点的大小
+  function updateAllMarkPointsSize() {
+    const svgElement = document.querySelector('#svg-container svg');
+    if (!svgElement) return;
+
+    const sizes = calculatePointSize();
+    const circles = svgElement.querySelectorAll('circle[data-mark-point="true"]');
+
+    circles.forEach(circle => {
+      circle.setAttribute('r', sizes.r);
+      circle.setAttribute('stroke-width', sizes.strokeWidth);
+    });
+  }
+
+  // 清除所有点击点
+  function clearClickPoints() {
+    clickPoints = [];
+    coordinateLogEle.value = '';
+
+    // 清除SVG中的圆点
+    const svgElement = document.querySelector('#svg-container svg');
+    if (svgElement) {
+      const circles = svgElement.querySelectorAll('circle');
+      circles.forEach(circle => circle.remove());
+    }
+  }
+
+  function setSvgSize(scale) {
+    const svgElement = document.querySelector('#svg-container svg');
+    if (!svgElement) return;
+    const viewBox = svgElement.viewBox.baseVal;
+    if (!viewBox.width || !viewBox.height) return;
+
+    // 计算新的尺寸，保持viewBox的比例
+    const aspectRatio = viewBox.width / viewBox.height;
+    const baseSize = viewBox.height;
+    const newWidth = baseSize * scale * aspectRatio;
+    const newHeight = baseSize * scale;
+    svgElement.style.width = newWidth + 'px';
+    svgElement.style.height = newHeight + 'px';
+    updateScaleIndicator();
+  }
+
+  function fitToContainer() {
+    const svgElement = document.querySelector('#svg-container svg');
+    if (!svgElement) return;
+    const container = svgContainerEle;
+    const viewBox = svgElement.viewBox.baseVal;
+    if (!viewBox.width || !viewBox.height) return;
+    const containerWidth = container.clientWidth - 20;
+    const containerHeight = window.innerHeight - 20 - buttonSvgBiggerEle.parentElement.clientHeight;
+
+    const aspectRatio = viewBox.width / viewBox.height;
+    const containerAspectRatio = containerWidth / containerHeight;
+    let newWidth, newHeight;
+    if (aspectRatio > containerAspectRatio) {
+      // SVG更宽，以宽度为准
+      newWidth = containerWidth;
+      newHeight = containerWidth / aspectRatio;
+    } else {
+      // SVG更高，以高度为准
+      newHeight = containerHeight;
+      newWidth = containerHeight * aspectRatio;
+    }
+    svgElement.style.width = newWidth + 'px';
+    svgElement.style.height = newHeight + 'px';
+    currentScale = newWidth / (viewBox.height * aspectRatio);
+    updateScaleIndicator();
+  }
+  buttonSvgBiggerEle.addEventListener('click', () => {
+    currentScale = Math.min(currentScale + scaleStep, maxScale);
+    setSvgSize(currentScale);
+    updateAllMarkPointsSize();
+  });
+  buttonSvgSmallerEle.addEventListener('click', () => {
+    currentScale = Math.max(currentScale - scaleStep, minScale);
+    setSvgSize(currentScale);
+    updateAllMarkPointsSize();
+  });
+  buttonSvgResetEle.addEventListener('click', () => {
+    currentScale = 1;
+    setSvgSize(currentScale);
+    updateAllMarkPointsSize();
+  });
+  buttonSvgFitEle.addEventListener('click', () => {
+    fitToContainer();
+    updateAllMarkPointsSize();
+  });
+
+  // 添加鼠标移动和点击事件
+  svgContainerEle.addEventListener('mousemove', (event) => {
+    const coords = screenToSvgCoords(event.clientX, event.clientY);
+    updateCoordinateDisplay(coords.x, coords.y);
+  });
+
+  svgContainerEle.addEventListener('click', (event) => {
+    const coords = screenToSvgCoords(event.clientX, event.clientY);
+    addClickPoint(coords.x, coords.y);
+  });
+
+  // 监听坐标记录textarea的变化
+  coordinateLogEle.addEventListener('change', () => {
+    updateClickPointsFromTextarea();
+  });
+
+</script>
+</body>
+</html>
