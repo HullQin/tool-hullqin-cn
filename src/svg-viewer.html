@@ -34,6 +34,20 @@
       height: 100px;
       border: 1px solid black;
     }
+    .saved-svg-item {
+      cursor: pointer;
+      border: 2px solid #ccc;
+      padding: 4px;
+      border-radius: 4px;
+    }
+    .saved-svg-item.selected {
+      border-color: #007bff;
+      background-color: #e7f3ff;
+    }
+    .saved-svg-item svg {
+      height: 100px;
+      border: none;
+    }
   </style>
 </head>
 <body>
@@ -60,6 +74,13 @@
     <br/>
     <textarea id="coordinate-log" style="height: 200px;"></textarea>
     <br/>
+    <div style="margin: 8px 0;">
+      <button id="btn-save">保存</button>
+      <button id="btn-update">更新</button>
+      <button id="btn-delete">删除</button>
+    </div>
+    <label>已保存的SVG:</label>
+    <div id="saved-svg-list" style="display: flex; flex-wrap: wrap; gap: 8px; margin-top: 8px;"></div>
   </div>
 </div>
 <script>
@@ -121,9 +142,9 @@
       svgContainerEle.innerHTML = processedSvg;
       textareaEle.value = processedSvg;
       // 更新SVG后自动调整尺寸
-      setTimeout(() => {
+      requestAnimationFrame(() => {
         setSvgSize(currentScale);
-      }, 100);
+      });
     } catch (e) {
       console.error(e);
     }
@@ -167,16 +188,11 @@
 
   // 添加点击坐标到记录
   function addClickPoint(x, y) {
-    clickPoints.push({ x: x, y: y });
-
-    // 更新坐标记录textarea
-    const logText = clickPoints.map(point =>
-      `${point.x.toFixed(2)},${point.y.toFixed(2)}`
-    ).join('\n');
-    coordinateLogEle.value = logText;
-
-    // 在SVG中添加红色圆点
-    addPointToSvg(x, y);
+    const xx = x.toFixed(2);
+    const yy = y.toFixed(2);
+    clickPoints.push({ x: xx, y: yy });
+    coordinateLogEle.value = clickPoints.map(point => `${point.x},${point.y}`).join('\n');
+    addPointToSvg(xx, yy);
   }
 
   // 计算圆点的半径和边框宽度
@@ -370,6 +386,187 @@
   coordinateLogEle.addEventListener('change', () => {
     updateClickPointsFromTextarea();
   });
+
+  // 存储功能
+  const savedSvgListEle = document.getElementById('saved-svg-list');
+  const btnSaveEle = document.getElementById('btn-save');
+  const btnUpdateEle = document.getElementById('btn-update');
+  const btnDeleteEle = document.getElementById('btn-delete');
+  const STORAGE_KEY = 'svgViewer_savedSvgs';
+  let selectedSvgId = null;
+
+  // 从localStorage读取保存的SVG
+  function loadSavedSvgs() {
+    const saved = localStorage.getItem(STORAGE_KEY);
+    return saved ? JSON.parse(saved) : [];
+  }
+
+  // 保存到localStorage
+  function saveToStorage(data) {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
+  }
+
+  // 获取当前SVG源码和标记点
+  function getCurrentSvgData() {
+    const svgElement = document.querySelector('#svg-container svg');
+    if (!svgElement) return null;
+    return {
+      svgSource: textareaEle.value,
+      clickPoints: [...clickPoints],
+      createdAt: +new Date(),
+      updatedAt: +new Date()
+    };
+  }
+
+  // 生成预览图的SVG源码（不包含标记点）
+  function generatePreviewSvg(svgSource) {
+    const parser = new DOMParser();
+    const doc = parser.parseFromString(svgSource, 'image/svg+xml');
+    const svg = doc.querySelector('svg');
+    if (!svg) return null;
+    
+    let viewBox = svg.getAttribute('viewBox');
+    if (!viewBox) {
+      // 如果没有viewBox，尝试从width和height计算
+      const width = parseFloat(svg.getAttribute('width')) || 100;
+      const height = parseFloat(svg.getAttribute('height')) || 100;
+      viewBox = `0 0 ${width} ${height}`;
+    }
+    
+    const parts = viewBox.split(/\s+/).map(Number);
+    if (parts.length < 4) return null;
+    
+    const [, , width, height] = parts;
+    if (!width || !height) return null;
+    
+    const aspectRatio = width / height;
+    const previewHeight = 100;
+    const previewWidth = previewHeight * aspectRatio;
+    
+    // 创建预览SVG的副本，设置尺寸
+    const previewSvg = svg.cloneNode(true);
+    previewSvg.setAttribute('width', previewWidth);
+    previewSvg.setAttribute('height', previewHeight);
+    
+    const serializer = new XMLSerializer();
+    return serializer.serializeToString(previewSvg);
+  }
+
+  // 渲染预览列表
+  function renderSavedSvgs() {
+    const savedSvgs = loadSavedSvgs();
+    savedSvgListEle.innerHTML = '';
+    
+    savedSvgs.forEach((item, index) => {
+      const previewSvg = generatePreviewSvg(item.svgSource);
+      if (!previewSvg) return;
+      
+      const itemDiv = document.createElement('div');
+      itemDiv.className = `saved-svg-item ${selectedSvgId === item.id ? 'selected' : ''}`;
+      itemDiv.innerHTML = previewSvg;
+      itemDiv.dataset.id = item.id;
+      
+      itemDiv.addEventListener('click', () => {
+        loadSvgData(item);
+        selectedSvgId = item.id;
+        renderSavedSvgs();
+        updateButtonStates();
+      });
+      
+      savedSvgListEle.appendChild(itemDiv);
+    });
+  }
+
+  // 加载SVG数据到编辑区
+  function loadSvgData(item) {
+    textareaEle.value = item.svgSource;
+    
+    // 更新坐标记录
+    const logText = item.clickPoints.map(point => 
+      `${point.x.toFixed(2)},${point.y.toFixed(2)}`
+    ).join('\n');
+    coordinateLogEle.value = logText;
+    
+    // 更新SVG预览和标记点
+    clickPoints = item.clickPoints;
+    const processedSvg = processSvgInput(item.svgSource);
+    svgContainerEle.innerHTML = processedSvg;
+
+    requestAnimationFrame(() => {
+      currentScale = 1;
+      setSvgSize(currentScale);
+      updateSvgPoints();
+    });
+  }
+
+  // 更新按钮状态
+  function updateButtonStates() {
+    const hasSelected = selectedSvgId !== null;
+    btnUpdateEle.disabled = !hasSelected;
+    btnDeleteEle.disabled = !hasSelected;
+  }
+
+  // 保存新SVG
+  function saveSvg() {
+    const data = getCurrentSvgData();
+    if (!data) return;
+    
+    const savedSvgs = loadSavedSvgs();
+    const newId = Date.now().toString();
+    savedSvgs.push({
+      id: newId,
+      ...data
+    });
+    
+    saveToStorage(savedSvgs);
+    selectedSvgId = newId;
+    renderSavedSvgs();
+    updateButtonStates();
+  }
+
+  // 更新选中的SVG
+  function updateSvg() {
+    if (!selectedSvgId) return;
+    
+    const data = getCurrentSvgData();
+    if (!data) return;
+    
+    const savedSvgs = loadSavedSvgs();
+    const index = savedSvgs.findIndex(item => item.id === selectedSvgId);
+    if (index === -1) return;
+    
+    savedSvgs[index] = {
+      ...savedSvgs[index],
+      svgSource: data.svgSource,
+      clickPoints: data.clickPoints,
+      updatedAt: +new Date()
+    };
+    
+    saveToStorage(savedSvgs);
+    renderSavedSvgs();
+  }
+
+  // 删除选中的SVG
+  function deleteSvg() {
+    if (!selectedSvgId) return;
+    
+    const savedSvgs = loadSavedSvgs();
+    const filtered = savedSvgs.filter(item => item.id !== selectedSvgId);
+    
+    saveToStorage(filtered);
+    selectedSvgId = null;
+    renderSavedSvgs();
+    updateButtonStates();
+  }
+
+  // 绑定按钮事件
+  btnSaveEle.addEventListener('click', saveSvg);
+  btnUpdateEle.addEventListener('click', updateSvg);
+  btnDeleteEle.addEventListener('click', deleteSvg);
+
+  // 初始化：渲染已保存的SVG
+  renderSavedSvgs();
+  updateButtonStates();
 
 </script>
 </body>
