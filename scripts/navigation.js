@@ -13,6 +13,7 @@ const config = [
   {name: '颜色混合', url: 'color-mixer.html'},
   {name: '图片裁剪', url: 'img-editor.html'},
   {name: 'SVG预览', url: 'svg-viewer.html'},
+  {name: 'SVG转PNG', url: 'svg-to-png.html'},
 ];
 const getNavigationHtml = (filename) => {
   let div = `

@@ -1,0 +1,316 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+  <meta charset="utf-8">
+  <title>SVG转PNG</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="转换SVG为PNG，支持设定PNG尺寸">
+  <style>
+    body {
+      margin: 0;
+    }
+    #root {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+    }
+    .container {
+      display: flex;
+      flex-direction: column;
+    }
+    .input-group {
+      display: flex;
+      flex-direction: column;
+      margin-bottom: 15px;
+    }
+    .input-row {
+      display: flex;
+      align-items: center;
+      margin-bottom: 10px;
+    }
+    .input-row label {
+      margin-right: 10px;
+    }
+    .input-row input {
+      flex: 1;
+    }
+    .preview-group {
+      display: flex;
+      flex-direction: column;
+      margin-bottom: 15px;
+    }
+    .preview-container {
+      display: flex;
+      justify-content: center;
+    }
+    button {
+      align-self: stretch;
+    }
+  </style>
+</head>
+<body>
+<div id="root">
+  <div class="container">
+    <h1>SVG转PNG</h1>
+
+    <div class="input-group">
+      <label for="svgFile">选择SVG文件（支持拖拽上传）：</label>
+      <input type="file" id="svgFile" accept=".svg,image/svg+xml">
+    </div>
+
+    <div class="preview-group" id="previewGroup" style="display: none;">
+      <div class="preview-container">
+        <img id="svgPreview" alt="SVG预览">
+      </div>
+    </div>
+
+    <div class="input-group">
+      <div class="input-row">
+        <label for="width">宽度：</label>
+        <input type="number" id="width" placeholder="输入宽度（像素）">
+      </div>
+      <div class="input-row">
+        <label for="height">高度：</label>
+        <input type="number" id="height" placeholder="输入高度（像素）">
+      </div>
+    </div>
+
+    <button id="convertBtn">转换并下载</button>
+  </div>
+</div>
+
+<script>
+  let svgContent = '';
+  let aspectRatio = 1;
+  let originalFileName = '';
+
+  const svgFileInput = document.getElementById('svgFile');
+  const widthInput = document.getElementById('width');
+  const heightInput = document.getElementById('height');
+  const convertBtn = document.getElementById('convertBtn');
+  const previewGroup = document.getElementById('previewGroup');
+  const svgPreview = document.getElementById('svgPreview');
+
+  // 处理SVG文件
+  function handleSvgFile(file) {
+    if (!file) return;
+    if (!file.type.includes('svg') && !file.name.toLowerCase().endsWith('.svg')) {
+      alert('请选择SVG文件');
+      return;
+    }
+
+    originalFileName = file.name;
+
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      svgContent = event.target.result;
+      parseViewBox(svgContent);
+    };
+    reader.readAsText(file);
+  }
+
+  // 读取SVG文件
+  svgFileInput.addEventListener('change', async (e) => {
+    const file = e.target.files[0];
+    handleSvgFile(file);
+  });
+
+  // 拖拽上传
+  document.addEventListener('dragover', (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    e.dataTransfer.dropEffect = 'copy';
+  });
+
+  document.addEventListener('dragenter', (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+  });
+
+  document.addEventListener('drop', (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    const files = e.dataTransfer.files;
+    if (files.length > 0) {
+      const file = files[0];
+      // 更新文件输入框
+      const dataTransfer = new DataTransfer();
+      dataTransfer.items.add(file);
+      svgFileInput.files = dataTransfer.files;
+      handleSvgFile(file);
+    }
+  });
+
+  // 解析viewBox计算宽高比并设置默认值
+  function parseViewBox(svgText) {
+    const parser = new DOMParser();
+    const svgDoc = parser.parseFromString(svgText, 'image/svg+xml');
+    const svgElement = svgDoc.querySelector('svg');
+
+    if (!svgElement) {
+      aspectRatio = 1;
+      return;
+    }
+
+    const viewBox = svgElement.getAttribute('viewBox');
+    const width = svgElement.getAttribute('width');
+    const height = svgElement.getAttribute('height');
+
+    let svgWidth, svgHeight;
+
+    if (viewBox) {
+      const parts = viewBox.split(/\s+/);
+      if (parts.length >= 4) {
+        svgWidth = parseFloat(parts[2]);
+        svgHeight = parseFloat(parts[3]);
+      }
+    } else if (width && height) {
+      svgWidth = parseFloat(width);
+      svgHeight = parseFloat(height);
+    } else {
+      aspectRatio = 1;
+      return;
+    }
+
+    if (svgWidth > 0 && svgHeight > 0) {
+      aspectRatio = svgWidth / svgHeight;
+      // 如果宽度已经设置，保持宽度不变，只更新高度
+      if (widthInput.value) {
+        heightInput.value = Math.round(widthInput.value / aspectRatio);
+      } else {
+        // 否则设置默认宽度和高度
+        let defaultWidth = svgWidth;
+        let defaultHeight = svgHeight;
+
+        // 如果宽度或高度小于100，计算整数倍数使其都大于等于100
+        if (svgWidth < 100 || svgHeight < 100) {
+          const multiplier = Math.max(
+            Math.ceil(100 / svgWidth),
+            Math.ceil(100 / svgHeight)
+          );
+          defaultWidth = Math.round(svgWidth * multiplier);
+          defaultHeight = Math.round(svgHeight * multiplier);
+        }
+
+        widthInput.value = defaultWidth;
+        heightInput.value = defaultHeight;
+      }
+      // 更新预览
+      updatePreview();
+    } else {
+      aspectRatio = 1;
+    }
+  }
+
+  // 更新SVG预览
+  function updatePreview() {
+    if (!svgContent) return;
+
+    let previewWidth, previewHeight;
+
+    // 先按宽度250px计算高度
+    const heightAtMaxWidth = 250 / aspectRatio;
+
+    // 如果按宽度250px计算的高度不超过500px，则使用宽度250px
+    if (heightAtMaxWidth <= 500) {
+      previewWidth = 250;
+      previewHeight = heightAtMaxWidth;
+    } else {
+      // 否则使用高度500px，宽度按比例计算
+      previewHeight = 500;
+      previewWidth = 500 * aspectRatio;
+    }
+
+    svgPreview.width = previewWidth;
+    svgPreview.height = previewHeight;
+    svgPreview.src = 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(svgContent);
+    previewGroup.style.display = 'flex';
+  }
+
+  let isCalculating = false;
+
+  // 宽度输入时自动计算高度
+  widthInput.addEventListener('input', () => {
+    if (isCalculating) return;
+    if (widthInput.value && aspectRatio > 0) {
+      isCalculating = true;
+      heightInput.value = Math.round(widthInput.value / aspectRatio);
+      isCalculating = false;
+    }
+  });
+
+  // 高度输入时自动计算宽度
+  heightInput.addEventListener('input', () => {
+    if (isCalculating) return;
+    if (heightInput.value && aspectRatio > 0) {
+      isCalculating = true;
+      widthInput.value = Math.round(heightInput.value * aspectRatio);
+      isCalculating = false;
+    }
+  });
+
+  // 转换按钮
+  convertBtn.addEventListener('click', async () => {
+    if (!svgContent) {
+      alert('请先选择SVG文件');
+      return;
+    }
+
+    const width = parseInt(widthInput.value);
+    const height = parseInt(heightInput.value);
+
+    if (!width || !height || width <= 0 || height <= 0) {
+      alert('请输入有效的宽度和高度');
+      return;
+    }
+
+    try {
+      const pngDataUrl = await convertSvgToPng(svgContent, width, height);
+      downloadPng(pngDataUrl);
+    } catch (error) {
+      alert('转换失败：' + error.message);
+    }
+  });
+
+  // SVG转PNG
+  function convertSvgToPng(svgContent, width, height) {
+    return new Promise((resolve, reject) => {
+      const img = new Image();
+      const svgBlob = new Blob([svgContent], { type: 'image/svg+xml' });
+      const url = URL.createObjectURL(svgBlob);
+
+      img.onload = () => {
+        const canvas = document.createElement('canvas');
+        canvas.width = width;
+        canvas.height = height;
+        const ctx = canvas.getContext('2d');
+        ctx.drawImage(img, 0, 0, width, height);
+
+        URL.revokeObjectURL(url);
+        resolve(canvas.toDataURL('image/png'));
+      };
+
+      img.onerror = () => {
+        URL.revokeObjectURL(url);
+        reject(new Error('无法加载SVG图像'));
+      };
+
+      img.src = url;
+    });
+  }
+
+  // 下载PNG
+  function downloadPng(dataUrl) {
+    const link = document.createElement('a');
+    let downloadFileName = 'converted.png';
+    if (originalFileName) {
+      const nameWithoutExt = originalFileName.replace(/\.svg$/i, '');
+      downloadFileName = nameWithoutExt + '.png';
+    }
+    link.download = downloadFileName;
+    link.href = dataUrl;
+    link.click();
+  }
+</script>
+</body>
+</html>
