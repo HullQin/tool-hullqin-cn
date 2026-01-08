@@ -49,6 +49,11 @@
     <br/>
     <textarea id="bytes-16"></textarea>
   </div>
+  <div>
+    <label for="bytes-base64">Base64:</label>
+    <br/>
+    <textarea id="bytes-base64"></textarea>
+  </div>
   <div>(JSON) 解析结果:</div>
   <pre id="json"></pre>
   <div id="message"></div>
@@ -59,6 +64,7 @@
     2: document.getElementById('bytes-2'),
     10: document.getElementById('bytes-10'),
     16: document.getElementById('bytes-16'),
+    base64: document.getElementById('bytes-base64'),
   };
   const jsonEle = document.getElementById('json');
   const messageEle = document.getElementById('message');
@@ -105,17 +111,32 @@
           }
         } else if (type === 2) {
           iPlusPlus();
-          const length = value[i];
-          if (i + length >= value.length) throw new Error('Not Protocol Buffers');
+          // 解析长度字段（varint编码）
+          let length = 0;
+          const lengthBytes = [];
+          while (true) {
+            lengthBytes.push(value[i] & 127);
+            if (lengthBytes.length > 5) throw new Error('Not Protocol Buffers');
+            if ((value[i] & 128) === 0) {
+              i++;
+              break;
+            }
+            iPlusPlus();
+          }
+          for (let j = 0; j < lengthBytes.length; j++) {
+            length += lengthBytes[j] << (7 * j);
+          }
+          // 修复边界检查：使用 > 而不是 >=
+          if (i + length > value.length) throw new Error('Not Protocol Buffers');
           const temp = result[key];
           if (temp === undefined) {
-            result[key] = parseBytes(value.slice(i + 1, i + 1 + length));
+            result[key] = parseBytes(value.slice(i, i + length));
           } else if (Array.isArray(temp)) {
-            temp.push(parseBytes(value.slice(i + 1, i + 1 + length)));
+            temp.push(parseBytes(value.slice(i, i + length)));
           } else {
-            result[key] = [result[key], parseBytes(value.slice(i + 1, i + 1 + length))];
+            result[key] = [result[key], parseBytes(value.slice(i, i + length))];
           }
-          i += length;
+          i += length - 1;
         } else {
           throw new Error('Not Protocol Buffers');
         }
@@ -134,7 +155,11 @@
     console.log(bytes);
     Object.keys(bytesEle).forEach(radix => {
       const ele = bytesEle[radix];
-      ele.value = bytes.map(i => i.toString(Number(radix)).padStart(pad[radix], '0').padStart(8, ' ')).join(' ')
+      if (radix === 'base64') {
+        ele.value = btoa(String.fromCharCode(...bytes));
+      } else {
+        ele.value = bytes.map(i => i.toString(Number(radix)).padStart(pad[radix], '0').padStart(8, ' ')).join(' ')
+      }
     });
     jsonEle.textContent = JSON.stringify(parseBytes(bytes), null, 2);
   };
@@ -156,6 +181,15 @@
       setBytes(newBytes);
     }
   };
+  const changeBytesByBase64 = (value) => {
+    try {
+      const binaryString = atob(value.trim());
+      const newBytes = Array.from(binaryString, char => char.charCodeAt(0));
+      setBytes(newBytes);
+    } catch (e) {
+      throw new Error('Base64解析失败');
+    }
+  };
   const onUint8ValueChange = (radix) => (event) => {
     try {
       messageEle.innerText = '';
@@ -165,7 +199,18 @@
     }
   }
   Object.keys(bytesEle).forEach(radix => {
-    bytesEle[radix].addEventListener('change', onUint8ValueChange(Number(radix)));
+    if (radix === 'base64') {
+      bytesEle[radix].addEventListener('change', (event) => {
+        try {
+          messageEle.innerText = '';
+          changeBytesByBase64(event.target.value.trim());
+        } catch (e) {
+          messageEle.innerText = e.message;
+        }
+      });
+    } else {
+      bytesEle[radix].addEventListener('change', onUint8ValueChange(Number(radix)));
+    }
   });
 </script>
 </body>
