@@ -25,10 +25,20 @@
 </head>
 <body>
 <div id="root">
-  <label for="src">请选择图片: </label><input id="src" type="file" />
+  <label for="src">请选择图片(可拖拽上传) </label><input id="src" type="file" />
   <div>
-    <button id="slice-article">切割为掘金文章封面</button>
-    <button id="slice-column">切割为掘金专栏封面</button>
+    <label for="yOffset">Y起点 (复原后点图片可设置，默认切割中心区) </label><input id="yOffset" type="number" placeholder="输入纵坐标起点" min="-1" value="-1" />
+    <label for="yEnd">Y终点 (只能手动输入) </label><input id="yEnd" type="number" placeholder="输入纵坐标终点" min="-1" value="-1" />
+  </div>
+  <div>
+    <button id="reset">复原</button>
+    <button id="slice-to-end">切割到Y终点</button>
+  </div>
+  <div>
+    <button id="slice-xiaohongshu">切割为小红书(3:4)</button>
+    <button id="slice-wechat">切割为公众号首图(2.35:1)</button>
+    <button id="slice-douyin">切割为抖音封面(9:16)</button>
+    <button id="slice-bilibili">切割为B站封面比例(16:10)</button>
   </div>
   <canvas id="work"></canvas>
   <img id="background" class="hidden" alt="" src="data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7" />
@@ -36,31 +46,66 @@
     const inputEle = document.getElementById('src');
     const canvasEle = document.getElementById('work');
     const imgEle = document.getElementById('background');
-    const sliceArticleEle = document.getElementById('slice-article');
-    const sliceColumnEle = document.getElementById('slice-column');
+    const yOffsetEle = document.getElementById('yOffset');
+    const yEndEle = document.getElementById('yEnd');
+    const resetEle = document.getElementById('reset');
+    const sliceToEndEle = document.getElementById('slice-to-end');
+    const sliceXiaohongshuEle = document.getElementById('slice-xiaohongshu');
+    const sliceWechatEle = document.getElementById('slice-wechat');
+    const sliceDouyinEle = document.getElementById('slice-douyin');
+    const sliceBilibiliEle = document.getElementById('slice-bilibili');
     const ctx = canvasEle.getContext('2d');
+    let isOriginalImage = true;
     const resetCanvas = () => {
       canvasEle.setAttribute('width', imgEle.width.toString());
       canvasEle.setAttribute('height', imgEle.height.toString());
       ctx.drawImage(imgEle, 0, 0);
+      isOriginalImage = true;
     };
-    const setCanvasSize = (width, height) => {
+    const setCanvasSize = (targetRatio, yOffset = null) => {
       const currentWidth = imgEle.width;
       const currentHeight = imgEle.height;
-      const a = currentWidth * height;
-      const b = currentHeight * width;
-      if (a === b) return;
-      if (a > b) {
-        const newWidth = b / height;
-        canvasEle.setAttribute('width', newWidth.toString());
-        canvasEle.setAttribute('height', imgEle.height.toString());
-        ctx.drawImage(imgEle, (currentWidth - newWidth) / 2, 0, newWidth, currentHeight, 0, 0, newWidth, currentHeight);
-        return;
+      const currentRatio = currentWidth / currentHeight;
+
+      let targetWidth, targetHeight;
+
+      // 根据原始图片尺寸和目标比例计算目标尺寸
+      if (currentRatio > targetRatio) {
+        // 原始图片更宽，以高度为基准
+        targetHeight = currentHeight;
+        targetWidth = Math.round(currentHeight * targetRatio);
+      } else {
+        // 原始图片更高，以宽度为基准
+        targetWidth = currentWidth;
+        targetHeight = Math.round(currentWidth / targetRatio);
       }
-      const newHeight = a / width;
-      canvasEle.setAttribute('width', imgEle.width.toString());
-      canvasEle.setAttribute('height', newHeight.toString());
-      ctx.drawImage(imgEle, 0, (currentHeight - newHeight) / 2, currentWidth, newHeight, 0, 0, currentWidth, newHeight);
+
+      canvasEle.setAttribute('width', targetWidth.toString());
+      canvasEle.setAttribute('height', targetHeight.toString());
+
+      // 如果指定了yOffset，使用它；否则居中裁剪
+      let sourceX = 0;
+      let sourceY = 0;
+      let sourceWidth = currentWidth;
+      let sourceHeight = currentHeight;
+
+      if (currentRatio > targetRatio) {
+        // 宽度方向需要裁剪（图片太宽），水平居中裁剪
+        sourceWidth = Math.round(currentHeight * targetRatio);
+        sourceX = (currentWidth - sourceWidth) / 2;
+        sourceY = 0; // 高度使用全部
+        sourceHeight = currentHeight;
+      } else {
+        // 高度方向需要裁剪（图片太高），使用yOffset控制起始位置
+        sourceHeight = Math.round(currentWidth / targetRatio);
+        sourceX = 0; // 宽度使用全部
+        sourceWidth = currentWidth;
+        sourceY = yOffset !== null && yOffset >= 0 && yOffset <= currentHeight - sourceHeight ?
+          yOffset : (currentHeight - sourceHeight) / 2;
+      }
+
+      ctx.drawImage(imgEle, sourceX, sourceY, sourceWidth, sourceHeight, 0, 0, targetWidth, targetHeight);
+      isOriginalImage = false;
     };
     const onFileChange = (event) => {
       const file = event.target.files[0];
@@ -74,15 +119,120 @@
       };
       reader.readAsDataURL(file);
     }
-    const onClickSliceArticle = () => {
-      setCanvasSize(1303, 734);
+    const onClickReset = () => {
+      resetCanvas();
     };
-    const onClickSliceColumn = () => {
-      setCanvasSize(480, 270);
+    const onClickSliceToEnd = () => {
+      let yStart = parseInt(yOffsetEle.value);
+      let yEnd = parseInt(yEndEle.value);
+
+      const currentWidth = imgEle.width;
+      const currentHeight = imgEle.height;
+
+      // 如果没设置起点（-1），则从图片0开始切割
+      if (yStart === -1) {
+        yStart = 0;
+      }
+
+      // 如果没设置终点（-1），则切割到图片最后
+      if (yEnd === -1) {
+        yEnd = currentHeight;
+      }
+
+      if (yStart >= yEnd) {
+        alert('纵坐标起点必须小于终点');
+        return;
+      }
+
+      const cropHeight = yEnd - yStart;
+
+      canvasEle.setAttribute('width', currentWidth.toString());
+      canvasEle.setAttribute('height', cropHeight.toString());
+
+      ctx.drawImage(imgEle, 0, yStart, currentWidth, cropHeight, 0, 0, currentWidth, cropHeight);
+      isOriginalImage = false;
+    };
+    const onClickSliceXiaohongshu = () => {
+      const yEnd = parseInt(yEndEle.value);
+      if (yEnd !== -1) return; // 如果设置了终点，不执行切割操作
+
+      const yOffset = parseInt(yOffsetEle.value) === -1 ? null : parseInt(yOffsetEle.value);
+      setCanvasSize(3/4, yOffset); // 小红书 3:4
+    };
+    const onClickSliceWechat = () => {
+      const yEnd = parseInt(yEndEle.value);
+      if (yEnd !== -1) return; // 如果设置了终点，不执行切割操作
+
+      const yOffset = parseInt(yOffsetEle.value) === -1 ? null : parseInt(yOffsetEle.value);
+      setCanvasSize(2.35/1, yOffset); // 公众号首图 2.35:1
+    };
+    const onClickSliceDouyin = () => {
+      const yEnd = parseInt(yEndEle.value);
+      if (yEnd !== -1) return; // 如果设置了终点，不执行切割操作
+
+      const yOffset = parseInt(yOffsetEle.value) === -1 ? null : parseInt(yOffsetEle.value);
+      setCanvasSize(9/16, yOffset); // 抖音封面 9:16
+    };
+    const onClickSliceBilibili = () => {
+      const yEnd = parseInt(yEndEle.value);
+      if (yEnd !== -1) return; // 如果设置了终点，不执行切割操作
+
+      const yOffset = parseInt(yOffsetEle.value) === -1 ? null : parseInt(yOffsetEle.value);
+      setCanvasSize(16/10, yOffset); // B站封面 16:10
     };
     inputEle.addEventListener('change', onFileChange);
-    sliceArticleEle.addEventListener('click', onClickSliceArticle);
-    sliceColumnEle.addEventListener('click', onClickSliceColumn);
+    resetEle.addEventListener('click', onClickReset);
+    sliceToEndEle.addEventListener('click', onClickSliceToEnd);
+    sliceXiaohongshuEle.addEventListener('click', onClickSliceXiaohongshu);
+    sliceWechatEle.addEventListener('click', onClickSliceWechat);
+    sliceDouyinEle.addEventListener('click', onClickSliceDouyin);
+    sliceBilibiliEle.addEventListener('click', onClickSliceBilibili);
+
+    // 点击canvas设置纵坐标起点
+    canvasEle.addEventListener('click', (e) => {
+      // 如果没上传图片或者当前不是原图状态，不做任何操作
+      if (!isOriginalImage || imgEle.src === 'data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7') return;
+
+      const rect = canvasEle.getBoundingClientRect();
+      const scaleX = imgEle.width / rect.width;
+      const scaleY = imgEle.height / rect.height;
+      const y = Math.round((e.clientY - rect.top) * scaleY);
+
+      yOffsetEle.value = y;
+    });
+
+    // 拖拽上传
+    document.addEventListener('dragover', (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      e.dataTransfer.dropEffect = 'copy';
+    });
+
+    document.addEventListener('dragenter', (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+    });
+
+    document.addEventListener('drop', (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      const files = e.dataTransfer.files;
+      if (files.length > 0) {
+        const file = files[0];
+        // 检查是否为图片文件
+        if (!file.type.startsWith('image/')) {
+          alert('请选择图片文件');
+          return;
+        }
+        // 更新文件输入框
+        const dataTransfer = new DataTransfer();
+        dataTransfer.items.add(file);
+        inputEle.files = dataTransfer.files;
+        // 手动触发change事件
+        const event = new Event('change');
+        inputEle.dispatchEvent(event);
+      }
+    });
   </script>
 </div>
 </body>
