@@ -12,6 +12,7 @@ const config = [
   {name: '换行符清除', url: 'line-break-remover.html'},
   {name: '颜色混合', url: 'color-mixer.html'},
   {name: '图片裁剪', url: 'img-editor.html'},
+  {name: '图片压缩', url: 'img-compressor.html'},
   {name: 'SVG预览', url: 'svg-viewer.html'},
   {name: 'SVG转PNG', url: 'svg-to-png.html'},
 ];
