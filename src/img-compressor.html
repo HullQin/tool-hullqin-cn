@@ -34,6 +34,10 @@
       cursor: pointer;
     }
     .info { font-size: 12px; color: #888; }
+    .resize-group { display: inline-flex; gap: 12px; align-items: center; }
+    .resize-group label { color: #999; cursor: pointer; }
+    .resize-group label.active { color: #000; font-weight: bold; }
+    .resize-group input[type="number"] { width: 60px; }
   </style>
 </head>
 <body>
@@ -45,8 +49,13 @@
   </div>
   <div>
     <label>JPEG质量: <input type="range" id="quality" min="10" max="100" value="60"> <span id="quality-val">60</span>%</label>
-    &nbsp;
-    <label>缩放比例: <input type="range" id="scale" min="10" max="100" value="30"> <span id="scale-val">30</span>%</label>
+    <br><br>
+    <span>缩放方式（三选一，最后修改的生效）：</span>
+    <div class="resize-group">
+      <label id="label-scale" class="active">比例 <input type="number" id="scale" min="1" max="100" value="30">%</label>
+      <label id="label-width">固定宽度 <input type="number" id="fix-width" min="1" value="">px</label>
+      <label id="label-height">固定高度 <input type="number" id="fix-height" min="1" value="">px</label>
+    </div>
   </div>
   <div id="results"></div>
 </div>
@@ -57,10 +66,27 @@
   const qualityInput = document.getElementById('quality');
   const qualityVal = document.getElementById('quality-val');
   const scaleInput = document.getElementById('scale');
-  const scaleVal = document.getElementById('scale-val');
+  const fixWidthInput = document.getElementById('fix-width');
+  const fixHeightInput = document.getElementById('fix-height');
+  const labels = {
+    scale: document.getElementById('label-scale'),
+    width: document.getElementById('label-width'),
+    height: document.getElementById('label-height'),
+  };
+
+  let resizeMode = 'scale';
+
+  function setActive(mode) {
+    resizeMode = mode;
+    for (const [k, el] of Object.entries(labels)) {
+      el.classList.toggle('active', k === mode);
+    }
+  }
 
   qualityInput.addEventListener('input', () => qualityVal.textContent = qualityInput.value);
-  scaleInput.addEventListener('input', () => scaleVal.textContent = scaleInput.value);
+  scaleInput.addEventListener('change', () => setActive('scale'));
+  fixWidthInput.addEventListener('change', () => setActive('width'));
+  fixHeightInput.addEventListener('change', () => setActive('height'));
 
   dropZone.addEventListener('click', () => fileInput.click());
   dropZone.addEventListener('dragover', (e) => { e.preventDefault(); dropZone.classList.add('drag-over'); });
@@ -84,10 +110,19 @@
     reader.onload = (e) => {
       const img = new Image();
       img.onload = () => {
-        const scale = scaleInput.value / 100;
         const quality = qualityInput.value / 100;
-        const w = Math.round(img.width * scale);
-        const h = Math.round(img.height * scale);
+        let w, h;
+        if (resizeMode === 'width' && fixWidthInput.value) {
+          w = parseInt(fixWidthInput.value);
+          h = Math.round(img.height * (w / img.width));
+        } else if (resizeMode === 'height' && fixHeightInput.value) {
+          h = parseInt(fixHeightInput.value);
+          w = Math.round(img.width * (h / img.height));
+        } else {
+          const scale = (scaleInput.value || 30) / 100;
+          w = Math.round(img.width * scale);
+          h = Math.round(img.height * scale);
+        }
 
         const canvas = document.createElement('canvas');
         canvas.width = w;
