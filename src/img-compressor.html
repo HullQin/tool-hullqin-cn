@@ -6,46 +6,53 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="description" content="拖入JPG图片，缩小到30%并压缩">
   <style>
-    body { margin: 0; }
-    #root { margin: 16px; }
-    #drop-zone {
-      border: 2px dashed #999;
-      padding: 40px 20px;
-      text-align: center;
-      color: #666;
-      cursor: pointer;
-      margin-bottom: 16px;
-    }
-    #drop-zone.drag-over { border-color: #333; background: #f0f0f0; }
-    .result-item {
-      display: inline-block;
-      margin: 8px;
-      vertical-align: top;
-      text-align: center;
-    }
-    .result-item img {
-      max-width: 200px;
-      max-height: 200px;
-      display: block;
-      border: 1px solid #ccc;
-    }
-    .result-item button {
-      margin-top: 4px;
-      cursor: pointer;
-    }
-    .info { font-size: 12px; color: #888; }
-    .resize-group { display: inline-flex; gap: 12px; align-items: center; }
-    .resize-group label { color: #999; cursor: pointer; }
-    .resize-group label.active { color: #000; font-weight: bold; }
-    .resize-group input[type="number"] { width: 60px; }
+      body { margin: 0; }
+      #root { margin: 16px; }
+      #drop-zone {
+          border: 2px dashed #999;
+          padding: 40px 20px;
+          text-align: center;
+          color: #666;
+          cursor: pointer;
+          margin-bottom: 16px;
+      }
+      #drop-zone.drag-over { border-color: #333; background: #f0f0f0; }
+      .result-item {
+          display: inline-block;
+          margin: 8px;
+          vertical-align: top;
+          text-align: center;
+      }
+      .result-item img {
+          max-width: 200px;
+          max-height: 200px;
+          display: block;
+          border: 1px solid #ccc;
+      }
+      .filename-input {
+          margin-top: 6px;
+          padding: 4px;
+          width: 140px;
+          text-align: center;
+      }
+      .result-item button {
+          margin-top: 4px;
+          cursor: pointer;
+          margin-left: 4px;
+      }
+      .info { font-size: 12px; color: #888; }
+      .resize-group { display: inline-flex; gap: 12px; align-items: center; }
+      .resize-group label { color: #999; cursor: pointer; }
+      .resize-group label.active { color: #000; font-weight: bold; }
+      .resize-group input[type="number"] { width: 60px; }
   </style>
 </head>
 <body>
 <div id="root">
   <div>【工具说明】</div>
-  <div>拖入JPG图片，自动缩小为原尺寸的30%并压缩。适合微信群二维码等含大面积纯色区域的图片。</div>
-  <div id="drop-zone">将图片拖到此处，或点击选择文件
-    <input type="file" id="file-input" accept="image/jpeg,image/png,image/webp" multiple style="display:none">
+  <div>拖入/粘贴（Ctrl+V / Command+V）图片，自动缩小并压缩。适合微信群二维码等含大面积纯色区域的图片。</div>
+  <div id="drop-zone">将图片拖到此处，点击选择文件 或 直接粘贴图片
+    <input type="file" id="file-input" accept="image/jpeg,image/png,image/webp,image/gif" multiple style="display:none">
   </div>
   <div>
     <label>JPEG质量: <input type="range" id="quality" min="10" max="100" value="60"> <span id="quality-val">60</span>%</label>
@@ -60,113 +67,134 @@
   <div id="results"></div>
 </div>
 <script>
-  const dropZone = document.getElementById('drop-zone');
-  const fileInput = document.getElementById('file-input');
-  const results = document.getElementById('results');
-  const qualityInput = document.getElementById('quality');
-  const qualityVal = document.getElementById('quality-val');
-  const scaleInput = document.getElementById('scale');
-  const fixWidthInput = document.getElementById('fix-width');
-  const fixHeightInput = document.getElementById('fix-height');
-  const labels = {
-    scale: document.getElementById('label-scale'),
-    width: document.getElementById('label-width'),
-    height: document.getElementById('label-height'),
-  };
-
-  let resizeMode = 'scale';
-
-  function setActive(mode) {
-    resizeMode = mode;
-    for (const [k, el] of Object.entries(labels)) {
-      el.classList.toggle('active', k === mode);
-    }
-  }
-
-  qualityInput.addEventListener('input', () => qualityVal.textContent = qualityInput.value);
-  scaleInput.addEventListener('change', () => setActive('scale'));
-  fixWidthInput.addEventListener('change', () => setActive('width'));
-  fixHeightInput.addEventListener('change', () => setActive('height'));
-
-  dropZone.addEventListener('click', () => fileInput.click());
-  dropZone.addEventListener('dragover', (e) => { e.preventDefault(); dropZone.classList.add('drag-over'); });
-  dropZone.addEventListener('dragleave', () => dropZone.classList.remove('drag-over'));
-  dropZone.addEventListener('drop', (e) => {
-    e.preventDefault();
-    dropZone.classList.remove('drag-over');
-    handleFiles(e.dataTransfer.files);
-  });
-  fileInput.addEventListener('change', () => handleFiles(fileInput.files));
-
-  function handleFiles(files) {
-    for (const file of files) {
-      if (!file.type.startsWith('image/')) continue;
-      compressImage(file);
-    }
-  }
-
-  function compressImage(file) {
-    const reader = new FileReader();
-    reader.onload = (e) => {
-      const img = new Image();
-      img.onload = () => {
-        const quality = qualityInput.value / 100;
-        let w, h;
-        if (resizeMode === 'width' && fixWidthInput.value) {
-          w = parseInt(fixWidthInput.value);
-          h = Math.round(img.height * (w / img.width));
-        } else if (resizeMode === 'height' && fixHeightInput.value) {
-          h = parseInt(fixHeightInput.value);
-          w = Math.round(img.width * (h / img.height));
-        } else {
-          const scale = (scaleInput.value || 30) / 100;
-          w = Math.round(img.width * scale);
-          h = Math.round(img.height * scale);
-        }
-
-        const canvas = document.createElement('canvas');
-        canvas.width = w;
-        canvas.height = h;
-        const ctx = canvas.getContext('2d');
-        ctx.fillStyle = '#ffffff';
-        ctx.fillRect(0, 0, w, h);
-        ctx.drawImage(img, 0, 0, w, h);
-
-        canvas.toBlob((blob) => {
-          const url = URL.createObjectURL(blob);
-          const item = document.createElement('div');
-          item.className = 'result-item';
-
-          const preview = document.createElement('img');
-          preview.src = url;
-
-          const origKB = (file.size / 1024).toFixed(1);
-          const newKB = (blob.size / 1024).toFixed(1);
-          const ratio = (blob.size / file.size * 100).toFixed(1);
-
-          const info = document.createElement('div');
-          info.className = 'info';
-          info.textContent = img.width + 'x' + img.height + ' → ' + w + 'x' + h + ' | ' + origKB + 'KB → ' + newKB + 'KB (' + ratio + '%)';
-
-          const btn = document.createElement('button');
-          btn.textContent = '下载';
-          btn.onclick = () => {
-            const a = document.createElement('a');
-            a.href = url;
-            a.download = file.name.replace(/\.[^.]+$/, '') + '_compressed.jpg';
-            a.click();
-          };
-
-          item.appendChild(preview);
-          item.appendChild(info);
-          item.appendChild(btn);
-          results.appendChild(item);
-        }, 'image/jpeg', quality);
-      };
-      img.src = e.target.result;
+    const dropZone = document.getElementById('drop-zone');
+    const fileInput = document.getElementById('file-input');
+    const results = document.getElementById('results');
+    const qualityInput = document.getElementById('quality');
+    const qualityVal = document.getElementById('quality-val');
+    const scaleInput = document.getElementById('scale');
+    const fixWidthInput = document.getElementById('fix-width');
+    const fixHeightInput = document.getElementById('fix-height');
+    const labels = {
+        scale: document.getElementById('label-scale'),
+        width: document.getElementById('label-width'),
+        height: document.getElementById('label-height'),
     };
-    reader.readAsDataURL(file);
-  }
+
+    let resizeMode = 'scale';
+
+    function setActive(mode) {
+        resizeMode = mode;
+        for (const [k, el] of Object.entries(labels)) {
+            el.classList.toggle('active', k === mode);
+        }
+    }
+
+    qualityInput.addEventListener('input', () => qualityVal.textContent = qualityInput.value);
+    scaleInput.addEventListener('change', () => setActive('scale'));
+    fixWidthInput.addEventListener('change', () => setActive('width'));
+    fixHeightInput.addEventListener('change', () => setActive('height'));
+
+    dropZone.addEventListener('click', () => fileInput.click());
+    dropZone.addEventListener('dragover', (e) => { e.preventDefault(); dropZone.classList.add('drag-over'); });
+    dropZone.addEventListener('dragleave', () => dropZone.classList.remove('drag-over'));
+    dropZone.addEventListener('drop', (e) => {
+        e.preventDefault();
+        dropZone.classList.remove('drag-over');
+        handleFiles(e.dataTransfer.files);
+    });
+    fileInput.addEventListener('change', () => handleFiles(fileInput.files));
+
+    // ========== 新增：粘贴图片支持 ==========
+    document.addEventListener('paste', (e) => {
+        const items = e.clipboardData?.items;
+        if (!items) return;
+        for (const item of items) {
+            if (item.kind === 'file' && item.type.startsWith('image/')) {
+                const file = item.getAsFile();
+                compressImage(file);
+            }
+        }
+    });
+
+    function handleFiles(files) {
+        for (const file of files) {
+            if (!file.type.startsWith('image/')) continue;
+            compressImage(file);
+        }
+    }
+
+    function compressImage(file) {
+        const reader = new FileReader();
+        reader.onload = (e) => {
+            const img = new Image();
+            img.onload = () => {
+                const quality = qualityInput.value / 100;
+                let w, h;
+                if (resizeMode === 'width' && fixWidthInput.value) {
+                    w = parseInt(fixWidthInput.value);
+                    h = Math.round(img.height * (w / img.width));
+                } else if (resizeMode === 'height' && fixHeightInput.value) {
+                    h = parseInt(fixHeightInput.value);
+                    w = Math.round(img.width * (h / img.height));
+                } else {
+                    const scale = (scaleInput.value || 30) / 100;
+                    w = Math.round(img.width * scale);
+                    h = Math.round(img.height * scale);
+                }
+
+                const canvas = document.createElement('canvas');
+                canvas.width = w;
+                canvas.height = h;
+                const ctx = canvas.getContext('2d');
+                ctx.fillStyle = '#ffffff';
+                ctx.fillRect(0, 0, w, h);
+                ctx.drawImage(img, 0, 0, w, h);
+
+                canvas.toBlob((blob) => {
+                    const url = URL.createObjectURL(blob);
+                    const item = document.createElement('div');
+                    item.className = 'result-item';
+
+                    const preview = document.createElement('img');
+                    preview.src = url;
+
+                    const origKB = (file.size / 1024).toFixed(1);
+                    const newKB = (blob.size / 1024).toFixed(1);
+                    const ratio = (blob.size / file.size * 100).toFixed(1);
+
+                    const info = document.createElement('div');
+                    info.className = 'info';
+                    info.textContent = img.width + 'x' + img.height + ' → ' + w + 'x' + h + ' | ' + origKB + 'KB → ' + newKB + 'KB (' + ratio + '%)';
+
+                    // ========== 新增：自定义文件名输入框 ==========
+                    const filenameInput = document.createElement('input');
+                    filenameInput.type = 'text';
+                    filenameInput.className = 'filename-input';
+                    filenameInput.placeholder = '自定义文件名（可选）';
+
+                    const btn = document.createElement('button');
+                    btn.textContent = '下载';
+                    btn.onclick = () => {
+                        const a = document.createElement('a');
+                        a.href = url;
+                        const customName = filenameInput.value.trim();
+                        const baseName = customName || file.name.replace(/\.[^.]+$/, '');
+                        a.download = baseName + '.jpg';
+                        a.click();
+                    };
+
+                    item.appendChild(preview);
+                    item.appendChild(info);
+                    item.appendChild(filenameInput);
+                    item.appendChild(btn);
+                    results.appendChild(item);
+                }, 'image/jpeg', quality);
+            };
+            img.src = e.target.result;
+        };
+        reader.readAsDataURL(file);
+    }
 </script>
 </body>
 </html>
